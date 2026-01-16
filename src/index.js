@@ -16,6 +16,10 @@ const app = express();
 // Body parser
 app.use(express.json());
 
+// Mount routers
+const auth = require('./routes/authRoutes');
+app.use('/api/auth', auth);
+
 // Enable CORS
 app.use(cors());
 
