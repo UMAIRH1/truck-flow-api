@@ -7,11 +7,13 @@ const userSchema = mongoose.Schema(
         name: {
             type: String,
             required: [true, 'Please add a name'],
+            trim: true,
         },
         email: {
             type: String,
             required: [true, 'Please add an email'],
             unique: true,
+            lowercase: true,
             match: [
                 /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
                 'Please add a valid email',
@@ -29,20 +31,17 @@ const userSchema = mongoose.Schema(
         },
         role: {
             type: String,
-            enum: ['shipper', 'driver'],
-            default: 'shipper',
+            enum: ['manager', 'driver'],
+            default: 'driver',
         },
-        vehicleDetails: {
-            license: String,
-            truckType: String,
-            capacity: String,
-        },
-        isVerified: {
+        isActive: {
             type: Boolean,
-            default: false,
+            default: true,
         },
-        refreshToken: {
+        preferredLanguage: {
             type: String,
+            enum: ['en', 'el'],
+            default: 'en',
         },
     },
     {
@@ -50,12 +49,14 @@ const userSchema = mongoose.Schema(
     }
 );
 
-// Encrypt password using bcrypt
-userSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) {
-        next();
-    }
+// Index for faster queries
+userSchema.index({ role: 1, isActive: 1 });
 
+// Encrypt password using bcrypt
+userSchema.pre('save', async function () {
+    if (!this.isModified('password')) {
+        return;
+    }
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
 });
@@ -67,7 +68,7 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
 
 // Sign Access Token
 userSchema.methods.getSignedJwtToken = function () {
-    return jwt.sign({ id: this._id }, process.env.JWT_SECRET, {
+    return jwt.sign({ id: this._id, role: this.role }, process.env.JWT_SECRET, {
         expiresIn: process.env.JWT_EXPIRE,
     });
 };
