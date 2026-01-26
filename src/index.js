@@ -31,12 +31,14 @@ const userRoutes = require('./routes/userRoutes');
 const loadRoutes = require('./routes/loadRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const exportRoutes = require('./routes/exportRoutes');
+const uploadRoutes = require('./routes/uploadRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/loads', loadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/exports', exportRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

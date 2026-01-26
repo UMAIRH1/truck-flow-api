@@ -4,12 +4,16 @@ const {
     getDrivers,
     getDriver,
     toggleDriverStatus,
+    updateProfile,
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
 
-// All routes require authentication + manager role
+// Profile update - requires authentication only (any user can update their own profile)
+router.patch('/profile', protect, updateProfile);
+
+// All other routes require authentication + manager role
 router.use(protect);
 router.use(authorize('manager'));
 

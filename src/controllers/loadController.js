@@ -6,20 +6,51 @@ const { uploadToCloudinary } = require('../services/uploadService');
 // @access  Private/Manager
 exports.createLoad = async (req, res) => {
     try {
-        const { origin, destination, loadAmount, paymentTerms } = req.body;
+        const { 
+            pickupLocation,
+            dropoffLocation,
+            clientName,
+            clientPrice,
+            driverPrice,
+            shippingType,
+            loadWeight,
+            pallets,
+            loadingDate,
+            loadingTime,
+            paymentTerms,
+            fuel,
+            tolls,
+            otherExpenses,
+            notes,
+            driverId
+        } = req.body;
 
         // Validate required fields
-        if (!origin?.city || !origin?.postalCode || !destination?.city || !destination?.postalCode) {
+        if (!pickupLocation || !dropoffLocation) {
             return res.status(400).json({
                 success: false,
-                message: 'Origin and destination with city and postalCode are required',
+                message: 'Pickup and dropoff locations are required',
             });
         }
 
-        if (!loadAmount || !paymentTerms) {
+        if (!clientName) {
             return res.status(400).json({
                 success: false,
-                message: 'Load amount and payment terms are required',
+                message: 'Client name is required',
+            });
+        }
+
+        if (!clientPrice || !paymentTerms) {
+            return res.status(400).json({
+                success: false,
+                message: 'Client price and payment terms are required',
+            });
+        }
+
+        if (!loadingDate || !loadingTime) {
+            return res.status(400).json({
+                success: false,
+                message: 'Loading date and time are required',
             });
         }
 
@@ -28,25 +59,48 @@ exports.createLoad = async (req, res) => {
         const loadNumber = `LOAD-${String(count + 1001).padStart(4, '0')}`;
 
         // Calculate expected payout date
-        const expectedPayoutDate = new Date(
-            Date.now() + paymentTerms * 24 * 60 * 60 * 1000
-        );
+        const expectedPayoutDate = new Date(loadingDate);
+        expectedPayoutDate.setDate(expectedPayoutDate.getDate() + paymentTerms);
 
-        // Create load
-        const load = await Load.create({
+        // Create load with all fields
+        const loadData = {
             loadNumber,
             managerId: req.user._id,
-            origin,
-            destination,
-            loadAmount,
+            pickupLocation,
+            dropoffLocation,
+            clientName,
+            clientPrice,
+            driverPrice: driverPrice || 0,
+            shippingType: shippingType || 'FTL',
+            loadWeight: loadWeight || 0,
+            pallets: pallets || null,
+            loadingDate,
+            loadingTime,
             paymentTerms,
             expectedPayoutDate,
-        });
+            fuel: fuel || 0,
+            tolls: tolls || 0,
+            otherExpenses: otherExpenses || 0,
+            notes: notes || null,
+        };
+
+        // Add driver if provided
+        if (driverId) {
+            loadData.driverId = driverId;
+        }
+
+        // Create load
+        const load = await Load.create(loadData);
+
+        // Populate driver info if assigned
+        const populatedLoad = await Load.findById(load._id)
+            .populate('managerId', 'name email')
+            .populate('driverId', 'name email phone');
 
         res.status(201).json({
             success: true,
             message: 'Load created successfully',
-            load,
+            load: populatedLoad,
         });
     } catch (err) {
         console.error(err);

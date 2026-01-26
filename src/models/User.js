@@ -43,6 +43,14 @@ const userSchema = mongoose.Schema(
             enum: ['en', 'el'],
             default: 'en',
         },
+        country: {
+            type: String,
+            default: 'Greece',
+        },
+        avatar: {
+            type: String,
+            default: '',
+        },
     },
     {
         timestamps: true,

@@ -149,3 +149,61 @@ exports.toggleDriverStatus = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
+// @desc    Update user profile (own profile)
+// @route   PATCH /api/users/profile
+// @access  Private
+exports.updateProfile = async (req, res) => {
+    try {
+        const { name, email, phone, country, avatar, password } = req.body;
+
+        const user = await User.findById(req.user.id);
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
+        // Check if email is being changed and if it's already taken
+        if (email && email !== user.email) {
+            const existingUser = await User.findOne({ email });
+            if (existingUser) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email already in use',
+                });
+            }
+            user.email = email;
+        }
+
+        // Update fields
+        if (name) user.name = name;
+        if (phone) user.phone = phone;
+        if (country) user.country = country;
+        if (avatar) user.avatar = avatar;
+        if (password && password !== '••••••••••••') {
+            user.password = password; // Will be hashed by pre-save hook
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: 'Profile updated successfully',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                phone: user.phone,
+                country: user.country,
+                avatar: user.avatar,
+                role: user.role,
+            },
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
