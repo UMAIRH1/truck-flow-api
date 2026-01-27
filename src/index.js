@@ -1,9 +1,11 @@
 const express = require('express');
+const http = require('http');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const connectDB = require('./config/db');
+const { initializeSocket } = require('./config/socket');
 
 // Load env vars
 dotenv.config();
@@ -12,6 +14,10 @@ dotenv.config();
 connectDB();
 
 const app = express();
+const server = http.createServer(app);
+
+// Initialize Socket.io
+initializeSocket(server);
 
 // Security middleware (MUST be before routes)
 app.use(helmet());
@@ -32,6 +38,8 @@ const loadRoutes = require('./routes/loadRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const seedRoutes = require('./routes/seedRoutes');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -39,6 +47,8 @@ app.use('/api/loads', loadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/seed', seedRoutes); // Public seed endpoint
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -59,6 +69,7 @@ app.use((req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    console.log(`WebSocket server initialized`);
 });

@@ -1,0 +1,23 @@
+# Platform.sh configuration
+name: truckflow-backend
+type: nodejs:18
+
+hooks:
+  build: |
+    npm install
+  deploy: |
+    node seed.js
+
+web:
+  commands:
+    start: "node start.js"
+  locations:
+    "/":
+      passthru: true
+
+disk: 512
+
+mounts:
+  "/.tmp":
+    source: local
+    source_path: tmp

@@ -1,5 +1,6 @@
 const Load = require('../models/Load');
-const { uploadToCloudinary } = require('../services/uploadService');
+const { convertToBase64, validateImageFile } = require('../services/uploadService');
+const notificationService = require('../services/notificationService');
 
 // @desc    Create load (manager only)
 // @route   POST /api/loads
@@ -18,6 +19,7 @@ exports.createLoad = async (req, res) => {
             loadingDate,
             loadingTime,
             paymentTerms,
+            expectedPayoutDate,
             fuel,
             tolls,
             otherExpenses,
@@ -54,18 +56,16 @@ exports.createLoad = async (req, res) => {
             });
         }
 
-        // Generate load number
-        const count = await Load.countDocuments();
-        const loadNumber = `LOAD-${String(count + 1001).padStart(4, '0')}`;
+        // Calculate expected payout date if not provided
+        let calculatedPayoutDate = expectedPayoutDate;
+        if (!calculatedPayoutDate && loadingDate && paymentTerms) {
+            calculatedPayoutDate = new Date(loadingDate);
+            calculatedPayoutDate.setDate(calculatedPayoutDate.getDate() + paymentTerms);
+        }
 
-        // Calculate expected payout date
-        const expectedPayoutDate = new Date(loadingDate);
-        expectedPayoutDate.setDate(expectedPayoutDate.getDate() + paymentTerms);
-
-        // Create load with all fields
+        // Create load with all fields matching UI
         const loadData = {
-            loadNumber,
-            managerId: req.user._id,
+            createdBy: req.user._id,
             pickupLocation,
             dropoffLocation,
             clientName,
@@ -73,20 +73,21 @@ exports.createLoad = async (req, res) => {
             driverPrice: driverPrice || 0,
             shippingType: shippingType || 'FTL',
             loadWeight: loadWeight || 0,
-            pallets: pallets || null,
+            pallets: pallets || undefined,
             loadingDate,
             loadingTime,
-            paymentTerms,
-            expectedPayoutDate,
+            paymentTerms: paymentTerms || 45,
+            expectedPayoutDate: calculatedPayoutDate,
             fuel: fuel || 0,
             tolls: tolls || 0,
             otherExpenses: otherExpenses || 0,
-            notes: notes || null,
+            notes: notes || '',
+            status: 'pending',
         };
 
         // Add driver if provided
         if (driverId) {
-            loadData.driverId = driverId;
+            loadData.assignedDriver = driverId;
         }
 
         // Create load
@@ -94,8 +95,17 @@ exports.createLoad = async (req, res) => {
 
         // Populate driver info if assigned
         const populatedLoad = await Load.findById(load._id)
-            .populate('managerId', 'name email')
-            .populate('driverId', 'name email phone');
+            .populate('createdBy', 'name email')
+            .populate('assignedDriver', 'name email phone');
+
+        // Send notification to driver if assigned
+        if (driverId) {
+            try {
+                await notificationService.notifyDriverLoadAssigned(driverId, populatedLoad);
+            } catch (notifError) {
+                console.error('Error sending notification:', notifError);
+            }
+        }
 
         res.status(201).json({
             success: true,
@@ -117,7 +127,10 @@ exports.getLoads = async (req, res) => {
 
         // Driver can only see their assigned loads
         if (req.user.role === 'driver') {
-            query.driverId = req.user._id;
+            query.assignedDriver = req.user._id;
+        } else if (req.user.role === 'manager') {
+            // Manager sees loads they created
+            query.createdBy = req.user._id;
         }
 
         // Optional status filter
@@ -126,8 +139,8 @@ exports.getLoads = async (req, res) => {
         }
 
         const loads = await Load.find(query)
-            .populate('managerId', 'name email')
-            .populate('driverId', 'name email phone')
+            .populate('createdBy', 'name email')
+            .populate('assignedDriver', 'name email phone')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
@@ -141,14 +154,38 @@ exports.getLoads = async (req, res) => {
     }
 };
 
+// Helper function to find load by ID or loadNumber
+const findLoadByIdOrNumber = async (identifier) => {
+    // Try to find by MongoDB _id first
+    if (identifier.match(/^[0-9a-fA-F]{24}$/)) {
+        return await Load.findById(identifier);
+    }
+    
+    // Otherwise, search by matching the last 8 characters of _id (our loadNumber logic)
+    const loads = await Load.find({});
+    return loads.find(load => {
+        const loadNumber = load._id.toString().slice(-8).toUpperCase();
+        return loadNumber === identifier.toUpperCase();
+    });
+};
+
 // @desc    Get single load
 // @route   GET /api/loads/:id
 // @access  Private
 exports.getLoad = async (req, res) => {
     try {
-        const load = await Load.findById(req.params.id)
-            .populate('managerId', 'name email')
-            .populate('driverId', 'name email phone');
+        const load = await findLoadByIdOrNumber(req.params.id);
+
+        if (!load) {
+            return res.status(404).json({
+                success: false,
+                message: 'Load not found',
+            });
+        }
+
+        // Populate after finding
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
 
         if (!load) {
             return res.status(404).json({
@@ -159,7 +196,7 @@ exports.getLoad = async (req, res) => {
 
         // Driver can only view their assigned loads
         if (req.user.role === 'driver' && 
-            (!load.driverId || load.driverId._id.toString() !== req.user._id.toString())) {
+            (!load.assignedDriver || load.assignedDriver._id.toString() !== req.user._id.toString())) {
             return res.status(403).json({
                 success: false,
                 message: 'Not authorized to view this load',
@@ -182,12 +219,88 @@ exports.getLoad = async (req, res) => {
     }
 };
 
+// @desc    Update load (manager only)
+// @route   PATCH /api/loads/:id
+// @access  Private/Manager
+exports.updateLoad = async (req, res) => {
+    try {
+        const load = await findLoadByIdOrNumber(req.params.id);
+
+        if (!load) {
+            return res.status(404).json({
+                success: false,
+                message: 'Load not found',
+            });
+        }
+
+        // Only allow updating if load is pending or accepted
+        if (load.status === 'completed') {
+            return res.status(400).json({
+                success: false,
+                message: 'Cannot update a completed load',
+            });
+        }
+
+        const {
+            pickupLocation,
+            dropoffLocation,
+            clientName,
+            clientPrice,
+            driverPrice,
+            shippingType,
+            loadWeight,
+            pallets,
+            loadingDate,
+            loadingTime,
+            paymentTerms,
+            expectedPayoutDate,
+            fuel,
+            tolls,
+            otherExpenses,
+            notes,
+        } = req.body;
+
+        // Update fields if provided
+        if (pickupLocation) load.pickupLocation = pickupLocation;
+        if (dropoffLocation) load.dropoffLocation = dropoffLocation;
+        if (clientName) load.clientName = clientName;
+        if (clientPrice !== undefined) load.clientPrice = clientPrice;
+        if (driverPrice !== undefined) load.driverPrice = driverPrice;
+        if (shippingType) load.shippingType = shippingType;
+        if (loadWeight !== undefined) load.loadWeight = loadWeight;
+        if (pallets !== undefined) load.pallets = pallets;
+        if (loadingDate) load.loadingDate = loadingDate;
+        if (loadingTime) load.loadingTime = loadingTime;
+        if (paymentTerms !== undefined) load.paymentTerms = paymentTerms;
+        if (expectedPayoutDate) load.expectedPayoutDate = expectedPayoutDate;
+        if (fuel !== undefined) load.fuel = fuel;
+        if (tolls !== undefined) load.tolls = tolls;
+        if (otherExpenses !== undefined) load.otherExpenses = otherExpenses;
+        if (notes !== undefined) load.notes = notes;
+
+        await load.save();
+
+        const updatedLoad = await Load.findById(load._id)
+            .populate('createdBy', 'name email')
+            .populate('assignedDriver', 'name email phone');
+
+        res.status(200).json({
+            success: true,
+            message: 'Load updated successfully',
+            load: updatedLoad,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
 // @desc    Delete load (manager only)
 // @route   DELETE /api/loads/:id
 // @access  Private/Manager
 exports.deleteLoad = async (req, res) => {
     try {
-        const load = await Load.findById(req.params.id);
+        const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
             return res.status(404).json({
@@ -228,7 +341,7 @@ exports.assignDriver = async (req, res) => {
             });
         }
 
-        const load = await Load.findById(req.params.id);
+        const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
             return res.status(404).json({
@@ -245,13 +358,20 @@ exports.assignDriver = async (req, res) => {
             });
         }
 
-        load.driverId = driverId;
+        load.assignedDriver = driverId;
         load.status = 'pending';
         await load.save();
 
         const updatedLoad = await Load.findById(load._id)
-            .populate('managerId', 'name email')
-            .populate('driverId', 'name email phone');
+            .populate('createdBy', 'name email')
+            .populate('assignedDriver', 'name email phone');
+
+        // Send notification to driver
+        try {
+            await notificationService.notifyDriverLoadAssigned(driverId, updatedLoad);
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
 
         res.status(200).json({
             success: true,
@@ -269,7 +389,7 @@ exports.assignDriver = async (req, res) => {
 // @access  Private/Driver
 exports.acceptLoad = async (req, res) => {
     try {
-        const load = await Load.findById(req.params.id);
+        const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
             return res.status(404).json({
@@ -279,7 +399,7 @@ exports.acceptLoad = async (req, res) => {
         }
 
         // Check if load is assigned to this driver
-        if (!load.driverId || load.driverId.toString() !== req.user._id.toString()) {
+        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
@@ -297,6 +417,21 @@ exports.acceptLoad = async (req, res) => {
         load.status = 'accepted';
         await load.save();
 
+        // Populate load to get driver name
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerLoadAccepted(
+                load.createdBy._id,
+                load,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
+
         res.status(200).json({
             success: true,
             message: 'Load accepted successfully',
@@ -313,7 +448,7 @@ exports.acceptLoad = async (req, res) => {
 // @access  Private/Driver
 exports.declineLoad = async (req, res) => {
     try {
-        const load = await Load.findById(req.params.id);
+        const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
             return res.status(404).json({
@@ -323,7 +458,7 @@ exports.declineLoad = async (req, res) => {
         }
 
         // Check if load is assigned to this driver
-        if (!load.driverId || load.driverId.toString() !== req.user._id.toString()) {
+        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
@@ -338,8 +473,23 @@ exports.declineLoad = async (req, res) => {
             });
         }
 
-        load.status = 'declined';
+        load.status = 'rejected';
         await load.save();
+
+        // Populate load to get manager info
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerLoadRejected(
+                load.createdBy._id,
+                load,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
 
         res.status(200).json({
             success: true,
@@ -358,14 +508,24 @@ exports.declineLoad = async (req, res) => {
 // @access  Private/Driver
 exports.uploadPOD = async (req, res) => {
     try {
-        if (!req.file) {
+        const { image } = req.body;
+
+        if (!image) {
             return res.status(400).json({
                 success: false,
-                message: 'Please upload an image file',
+                message: 'Please provide an image',
             });
         }
 
-        const load = await Load.findById(req.params.id);
+        // Validate base64 image
+        if (!image.startsWith('data:image/')) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid image format',
+            });
+        }
+
+        const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
             return res.status(404).json({
@@ -375,7 +535,7 @@ exports.uploadPOD = async (req, res) => {
         }
 
         // Check if load is assigned to this driver
-        if (!load.driverId || load.driverId.toString() !== req.user._id.toString()) {
+        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
@@ -390,16 +550,26 @@ exports.uploadPOD = async (req, res) => {
             });
         }
 
-        // Upload to Cloudinary
-        const result = await uploadToCloudinary(req.file.buffer);
-
-        // Update load with POD
-        load.pod = {
-            imageUrl: result.secure_url,
-            uploadedAt: new Date(),
-        };
+        // Update load with POD (base64 image)
+        load.podImage = image;
         load.status = 'completed';
+        load.completedAt = new Date();
         await load.save();
+
+        // Populate load to get manager info
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerLoadCompleted(
+                load.createdBy._id,
+                load,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
 
         res.status(200).json({
             success: true,

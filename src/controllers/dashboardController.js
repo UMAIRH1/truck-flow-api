@@ -6,45 +6,45 @@ const Load = require('../models/Load');
 exports.getManagerDashboard = async (req, res) => {
     try {
         // Total loads
-        const totalLoads = await Load.countDocuments({ managerId: req.user._id });
+        const totalLoads = await Load.countDocuments({ createdBy: req.user._id });
 
         // Accepted loads
         const acceptedLoads = await Load.countDocuments({
-            managerId: req.user._id,
+            createdBy: req.user._id,
             status: 'accepted',
         });
 
         // Completed loads
         const completedLoads = await Load.countDocuments({
-            managerId: req.user._id,
+            createdBy: req.user._id,
             status: 'completed',
         });
 
         // Pending loads
         const pendingLoads = await Load.countDocuments({
-            managerId: req.user._id,
+            createdBy: req.user._id,
             status: 'pending',
         });
 
-        // Declined loads
-        const declinedLoads = await Load.countDocuments({
-            managerId: req.user._id,
-            status: 'declined',
+        // Rejected loads
+        const rejectedLoads = await Load.countDocuments({
+            createdBy: req.user._id,
+            status: 'rejected',
         });
 
-        // Total income (completed loads)
+        // Total income (completed loads - using clientPrice)
         const completedLoadsList = await Load.find({
-            managerId: req.user._id,
+            createdBy: req.user._id,
             status: 'completed',
         });
-        const totalIncome = completedLoadsList.reduce((sum, load) => sum + load.loadAmount, 0);
+        const totalIncome = completedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
         // Pending payments (accepted but not completed)
         const acceptedLoadsList = await Load.find({
-            managerId: req.user._id,
+            createdBy: req.user._id,
             status: 'accepted',
         });
-        const pendingPayments = acceptedLoadsList.reduce((sum, load) => sum + load.loadAmount, 0);
+        const pendingPayments = acceptedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
         res.status(200).json({
             success: true,
@@ -53,7 +53,7 @@ exports.getManagerDashboard = async (req, res) => {
                 acceptedLoads,
                 completedLoads,
                 pendingLoads,
-                declinedLoads,
+                rejectedLoads,
                 totalIncome,
                 pendingPayments,
             },
@@ -71,41 +71,41 @@ exports.getDriverDashboard = async (req, res) => {
     try {
         // Assigned loads (pending)
         const assignedLoads = await Load.countDocuments({
-            driverId: req.user._id,
+            assignedDriver: req.user._id,
             status: 'pending',
         });
 
         // Accepted loads
         const acceptedLoads = await Load.countDocuments({
-            driverId: req.user._id,
+            assignedDriver: req.user._id,
             status: 'accepted',
         });
 
         // Completed loads
         const completedLoads = await Load.countDocuments({
-            driverId: req.user._id,
+            assignedDriver: req.user._id,
             status: 'completed',
         });
 
-        // Declined loads
-        const declinedLoads = await Load.countDocuments({
-            driverId: req.user._id,
-            status: 'declined',
+        // Rejected loads
+        const rejectedLoads = await Load.countDocuments({
+            assignedDriver: req.user._id,
+            status: 'rejected',
         });
 
-        // Total earnings (completed loads)
+        // Total earnings (completed loads - using driverPrice)
         const completedLoadsList = await Load.find({
-            driverId: req.user._id,
+            assignedDriver: req.user._id,
             status: 'completed',
         });
-        const totalEarnings = completedLoadsList.reduce((sum, load) => sum + load.loadAmount, 0);
+        const totalEarnings = completedLoadsList.reduce((sum, load) => sum + (load.driverPrice || 0), 0);
 
         // Pending earnings (accepted but not completed)
         const acceptedLoadsList = await Load.find({
-            driverId: req.user._id,
+            assignedDriver: req.user._id,
             status: 'accepted',
         });
-        const pendingEarnings = acceptedLoadsList.reduce((sum, load) => sum + load.loadAmount, 0);
+        const pendingEarnings = acceptedLoadsList.reduce((sum, load) => sum + (load.driverPrice || 0), 0);
 
         res.status(200).json({
             success: true,
@@ -113,7 +113,7 @@ exports.getDriverDashboard = async (req, res) => {
                 assignedLoads,
                 acceptedLoads,
                 completedLoads,
-                declinedLoads,
+                rejectedLoads,
                 totalEarnings,
                 pendingEarnings,
             },
