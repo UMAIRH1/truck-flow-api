@@ -46,16 +46,31 @@ exports.createDriver = async (req, res) => {
         );
 
         // Send invitation email
+        let emailSent = false;
+        let emailError = null;
         try {
             await sendDriverInvitation(email, name, setupToken);
-        } catch (emailError) {
-            console.error('Failed to send invitation email:', emailError);
-            // Don't fail the request if email fails
+            emailSent = true;
+            console.log('✅ Driver invitation email sent successfully to:', email);
+        } catch (error) {
+            emailError = error.message;
+            console.error('❌ Failed to send invitation email:', error);
+            console.error('SMTP Config:', {
+                host: process.env.SMTP_HOST,
+                port: process.env.SMTP_PORT,
+                user: process.env.SMTP_USER,
+                hasPassword: !!process.env.SMTP_PASS,
+                frontendUrl: process.env.FRONTEND_URL,
+            });
         }
 
         res.status(201).json({
             success: true,
-            message: 'Driver created successfully. Invitation email sent.',
+            message: emailSent 
+                ? 'Driver created successfully. Invitation email sent.' 
+                : 'Driver created successfully. Email sending failed - please send invitation manually.',
+            emailSent,
+            emailError: emailError || undefined,
             driver: {
                 id: driver._id,
                 name: driver.name,
