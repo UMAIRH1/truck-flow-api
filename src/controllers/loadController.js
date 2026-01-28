@@ -517,11 +517,16 @@ exports.uploadPOD = async (req, res) => {
             });
         }
 
-        // Validate base64 image
-        if (!image.startsWith('data:image/')) {
+        // Validate image URL (Cloudinary or base64)
+        const isBase64 = image.startsWith('data:image/');
+        const isCloudinaryUrl = image.startsWith('https://res.cloudinary.com/');
+        const isHttpUrl = image.startsWith('http://') || image.startsWith('https://');
+        
+        if (!isBase64 && !isCloudinaryUrl && !isHttpUrl) {
+            console.log('Invalid image format received:', image.substring(0, 100));
             return res.status(400).json({
                 success: false,
-                message: 'Invalid image format',
+                message: 'Invalid image format. Expected Cloudinary URL or base64 image.',
             });
         }
 
@@ -550,7 +555,7 @@ exports.uploadPOD = async (req, res) => {
             });
         }
 
-        // Update load with POD (base64 image)
+        // Update load with POD (Cloudinary URL or base64)
         load.podImage = image;
         load.status = 'completed';
         load.completedAt = new Date();

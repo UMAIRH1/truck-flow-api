@@ -1,17 +1,19 @@
 const User = require('../models/User');
+const jwt = require('jsonwebtoken');
+const { sendDriverInvitation } = require('../services/emailService');
 
 // @desc    Create driver (manager only)
 // @route   POST /api/users
 // @access  Private/Manager
 exports.createDriver = async (req, res) => {
     try {
-        const { name, email, password, phone, preferredLanguage } = req.body;
+        const { name, email, phone, preferredLanguage } = req.body;
 
         // Validate required fields
-        if (!name || !email || !password || !phone) {
+        if (!name || !email || !phone) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide name, email, password and phone',
+                message: 'Please provide name, email, and phone',
             });
         }
 
@@ -24,19 +26,36 @@ exports.createDriver = async (req, res) => {
             });
         }
 
-        // Create driver
+        // Create driver with temporary password
+        const tempPassword = Math.random().toString(36).slice(-8);
         const driver = await User.create({
             name,
             email,
-            password,
+            password: tempPassword,
             phone,
             role: 'driver',
             preferredLanguage: preferredLanguage || 'en',
+            isActive: false, // Inactive until password is set
         });
+
+        // Generate setup token (valid for 24 hours)
+        const setupToken = jwt.sign(
+            { id: driver._id, email: driver.email, type: 'driver_setup' },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        // Send invitation email
+        try {
+            await sendDriverInvitation(email, name, setupToken);
+        } catch (emailError) {
+            console.error('Failed to send invitation email:', emailError);
+            // Don't fail the request if email fails
+        }
 
         res.status(201).json({
             success: true,
-            message: 'Driver created successfully',
+            message: 'Driver created successfully. Invitation email sent.',
             driver: {
                 id: driver._id,
                 name: driver.name,
@@ -137,6 +156,41 @@ exports.toggleDriverStatus = async (req, res) => {
                 email: driver.email,
                 isActive: driver.isActive,
             },
+        });
+    } catch (err) {
+        console.error(err);
+        if (err.kind === 'ObjectId') {
+            return res.status(404).json({
+                success: false,
+                message: 'Driver not found',
+            });
+        }
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Delete driver (manager only)
+// @route   DELETE /api/users/:id
+// @access  Private/Manager
+exports.deleteDriver = async (req, res) => {
+    try {
+        const driver = await User.findOne({
+            _id: req.params.id,
+            role: 'driver',
+        });
+
+        if (!driver) {
+            return res.status(404).json({
+                success: false,
+                message: 'Driver not found',
+            });
+        }
+
+        await driver.deleteOne();
+
+        res.status(200).json({
+            success: true,
+            message: 'Driver deleted successfully',
         });
     } catch (err) {
         console.error(err);

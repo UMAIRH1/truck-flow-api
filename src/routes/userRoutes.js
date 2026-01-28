@@ -4,6 +4,7 @@ const {
     getDrivers,
     getDriver,
     toggleDriverStatus,
+    deleteDriver,
     updateProfile,
 } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
@@ -22,7 +23,8 @@ router.route('/')
     .get(getDrivers);
 
 router.route('/:id')
-    .get(getDriver);
+    .get(getDriver)
+    .delete(deleteDriver);
 
 router.route('/:id/status')
     .patch(toggleDriverStatus);
