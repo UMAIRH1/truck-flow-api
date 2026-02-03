@@ -1,0 +1,76 @@
+{
+  "errors": {
+    "serverError": "Σφάλμα διακομιστή",
+    "notFound": "Δεν βρέθηκε",
+    "unauthorized": "Μη εξουσιοδοτημένος",
+    "forbidden": "Απαγορευμένη πρόσβαση",
+    "validationError": "Σφάλμα επικύρωσης"
+  },
+  "auth": {
+    "invalidCredentials": "Μη έγκυρο email ή κωδικός πρόσβασης",
+    "emailRequired": "Απαιτείται email",
+    "passwordRequired": "Απαιτείται κωδικός πρόσβασης",
+    "loginSuccess": "Επιτυχής σύνδεση",
+    "logoutSuccess": "Επιτυχής αποσύνδεση",
+    "tokenExpired": "Η συνεδρία έληξε. Παρακαλώ συνδεθείτε ξανά",
+    "userNotFound": "Ο χρήστης δεν βρέθηκε",
+    "emailAlreadyExists": "Υπάρχει ήδη χρήστης με αυτό το email",
+    "passwordResetSuccess": "Επιτυχής επαναφορά κωδικού",
+    "otpSent": "Το OTP στάλθηκε στο email σας",
+    "invalidOtp": "Μη έγκυρο ή ληγμένο OTP",
+    "passwordSetSuccess": "Ο κωδικός ορίστηκε επιτυχώς"
+  },
+  "load": {
+    "created": "Το φορτίο δημιουργήθηκε επιτυχώς",
+    "updated": "Το φορτίο ενημερώθηκε επιτυχώς",
+    "deleted": "Το φορτίο διαγράφηκε επιτυχώς",
+    "notFound": "Το φορτίο δεν βρέθηκε",
+    "assigned": "Το φορτίο ανατέθηκε στον οδηγό επιτυχώς",
+    "accepted": "Το φορτίο έγινε αποδεκτό επιτυχώς",
+    "rejected": "Το φορτίο απορρίφθηκε επιτυχώς",
+    "completed": "Το φορτίο ολοκληρώθηκε επιτυχώς",
+    "podUploaded": "Το POD μεταφορτώθηκε επιτυχώς. Το φορτίο σημειώθηκε ως ολοκληρωμένο",
+    "documentsUploaded": "Τα έγγραφα μεταφορτώθηκαν επιτυχώς",
+    "cannotUpdate": "Δεν είναι δυνατή η ενημέρωση ολοκληρωμένου φορτίου",
+    "notAssigned": "Αυτό το φορτίο δεν έχει ανατεθεί σε εσάς",
+    "canOnlyUploadForAccepted": "Μπορείτε να ανεβάσετε POD μόνο για αποδεκτά φορτία",
+    "invalidImageFormat": "Μη έγκυρη μορφή εικόνας"
+  },
+  "driver": {
+    "created": "Ο οδηγός δημιουργήθηκε επιτυχώς. Στάλθηκε email πρόσκλησης",
+    "createdNoEmail": "Ο οδηγός δημιουργήθηκε επιτυχώς. Η αποστολή email απέτυχε - παρακαλώ στείλτε πρόσκληση χειροκίνητα",
+    "notFound": "Ο οδηγός δεν βρέθηκε",
+    "activated": "Ο οδηγός ενεργοποιήθηκε επιτυχώς",
+    "deactivated": "Ο οδηγός απενεργοποιήθηκε επιτυχώς",
+    "deleted": "Ο οδηγός διαγράφηκε επιτυχώς",
+    "alreadyExists": "Υπάρχει ήδη χρήστης με αυτό το email"
+  },
+  "notification": {
+    "newLoad": "Νέο Φορτίο Δημιουργήθηκε",
+    "loadAssigned": "Φορτίο Ανατέθηκε σε Εσάς",
+    "loadAccepted": "Φορτίο Έγινε Αποδεκτό",
+    "loadRejected": "Φορτίο Απορρίφθηκε",
+    "loadCompleted": "Φορτίο Ολοκληρώθηκε",
+    "documentsUploaded": "Έγγραφα Μεταφορτώθηκαν",
+    "newLoadMessage": "Ένα νέο φορτίο δημιουργήθηκε",
+    "loadAssignedMessage": "σας ανέθεσε ένα νέο φορτίο",
+    "loadAcceptedMessage": "έκανε αποδεκτό το φορτίο",
+    "loadRejectedMessage": "απέρριψε το φορτίο",
+    "loadCompletedMessage": "ολοκλήρωσε το φορτίο",
+    "documentsUploadedMessage": "ανέβασε έγγραφα για το φορτίο"
+  },
+  "validation": {
+    "nameRequired": "Παρακαλώ δώστε όνομα",
+    "emailRequired": "Παρακαλώ δώστε email",
+    "phoneRequired": "Παρακαλώ δώστε τηλέφωνο",
+    "passwordRequired": "Παρακαλώ δώστε κωδικό πρόσβασης",
+    "pickupRequired": "Παρακαλώ προσθέστε τοποθεσία παραλαβής",
+    "dropoffRequired": "Παρακαλώ προσθέστε τοποθεσία παράδοσης",
+    "clientNameRequired": "Παρακαλώ προσθέστε όνομα πελάτη",
+    "clientPriceRequired": "Παρακαλώ προσθέστε τιμή πελάτη",
+    "loadingDateRequired": "Παρακαλώ προσθέστε ημερομηνία φόρτωσης",
+    "loadingTimeRequired": "Παρακαλώ προσθέστε ώρα φόρτωσης",
+    "imageRequired": "Παρακαλώ δώστε μια εικόνα",
+    "driverIdRequired": "Παρακαλώ δώστε ID οδηγού"
+  }
+}

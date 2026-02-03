@@ -9,7 +9,7 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['load_created', 'load_assigned', 'load_accepted', 'load_rejected', 'load_completed', 'load_cancelled'],
+    enum: ['load_created', 'load_assigned', 'load_accepted', 'load_rejected', 'load_completed', 'load_cancelled', 'documents_uploaded'],
     required: true
   },
   title: {
@@ -19,6 +19,18 @@ const notificationSchema = new mongoose.Schema({
   message: {
     type: String,
     required: true
+  },
+  // Translation keys for multi-language support
+  titleKey: {
+    type: String
+  },
+  messageKey: {
+    type: String
+  },
+  // Parameters for translation interpolation
+  params: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   loadId: {
     type: mongoose.Schema.Types.ObjectId,

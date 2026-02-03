@@ -586,3 +586,70 @@ exports.uploadPOD = async (req, res) => {
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };
+
+// @desc    Upload invoice and documents for load
+// @route   POST /api/loads/:id/documents
+// @access  Private/Driver
+exports.uploadDocuments = async (req, res) => {
+    try {
+        const { invoices, documents } = req.body;
+
+        if ((!invoices || invoices.length === 0) && (!documents || documents.length === 0)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide at least one invoice or document',
+            });
+        }
+
+        const load = await findLoadByIdOrNumber(req.params.id);
+
+        if (!load) {
+            return res.status(404).json({
+                success: false,
+                message: 'Load not found',
+            });
+        }
+
+        // Check if load is assigned to this driver
+        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'This load is not assigned to you',
+            });
+        }
+
+        // Update load with documents
+        if (invoices && invoices.length > 0) {
+            load.invoices = [...(load.invoices || []), ...invoices];
+        }
+        if (documents && documents.length > 0) {
+            load.documents = [...(load.documents || []), ...documents];
+        }
+
+        await load.save();
+
+        // Populate load to get manager info
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerDocumentsUploaded(
+                load.createdBy._id,
+                load,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Documents uploaded successfully',
+            load,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};

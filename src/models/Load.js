@@ -104,6 +104,12 @@ const loadSchema = mongoose.Schema(
         podImages: [{
             type: String,
         }],
+        invoices: [{
+            type: String,
+        }],
+        documents: [{
+            type: String,
+        }],
 
         // Creator reference
         createdBy: {

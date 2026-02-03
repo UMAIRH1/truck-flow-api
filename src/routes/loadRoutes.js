@@ -9,6 +9,7 @@ const {
     acceptLoad,
     declineLoad,
     uploadPOD,
+    uploadDocuments,
 } = require('../controllers/loadController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -27,6 +28,7 @@ router.patch('/:id/assign', authorize('manager'), assignDriver);
 router.patch('/:id/accept', authorize('driver'), acceptLoad);
 router.patch('/:id/decline', authorize('driver'), declineLoad);
 router.post('/:id/pod', authorize('driver'), uploadPOD);
+router.post('/:id/documents', authorize('driver'), uploadDocuments);
 
 // Both manager and driver (with role-based filtering in controller)
 router.get('/', getLoads);

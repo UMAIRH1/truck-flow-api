@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const connectDB = require('./config/db');
 const { initializeSocket } = require('./config/socket');
+const { languageMiddleware } = require('./utils/i18n');
 
 // Load env vars
 dotenv.config();
@@ -25,6 +26,9 @@ app.use(cors());
 
 // Body parser
 app.use(express.json());
+
+// Language middleware (MUST be before routes)
+app.use(languageMiddleware);
 
 // Dev logging middleware
 if (process.env.NODE_ENV === 'development') {

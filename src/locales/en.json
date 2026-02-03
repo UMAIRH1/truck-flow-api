@@ -1,0 +1,76 @@
+{
+  "errors": {
+    "serverError": "Server error",
+    "notFound": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden access",
+    "validationError": "Validation error"
+  },
+  "auth": {
+    "invalidCredentials": "Invalid email or password",
+    "emailRequired": "Email is required",
+    "passwordRequired": "Password is required",
+    "loginSuccess": "Login successful",
+    "logoutSuccess": "Logout successful",
+    "tokenExpired": "Session expired. Please login again",
+    "userNotFound": "User not found",
+    "emailAlreadyExists": "User with this email already exists",
+    "passwordResetSuccess": "Password reset successfully",
+    "otpSent": "OTP sent to your email",
+    "invalidOtp": "Invalid or expired OTP",
+    "passwordSetSuccess": "Password set successfully"
+  },
+  "load": {
+    "created": "Load created successfully",
+    "updated": "Load updated successfully",
+    "deleted": "Load deleted successfully",
+    "notFound": "Load not found",
+    "assigned": "Load assigned to driver successfully",
+    "accepted": "Load accepted successfully",
+    "rejected": "Load rejected successfully",
+    "completed": "Load completed successfully",
+    "podUploaded": "POD uploaded successfully. Load marked as completed",
+    "documentsUploaded": "Documents uploaded successfully",
+    "cannotUpdate": "Cannot update a completed load",
+    "notAssigned": "This load is not assigned to you",
+    "canOnlyUploadForAccepted": "Can only upload POD for accepted loads",
+    "invalidImageFormat": "Invalid image format"
+  },
+  "driver": {
+    "created": "Driver created successfully. Invitation email sent",
+    "createdNoEmail": "Driver created successfully. Email sending failed - please send invitation manually",
+    "notFound": "Driver not found",
+    "activated": "Driver activated successfully",
+    "deactivated": "Driver deactivated successfully",
+    "deleted": "Driver deleted successfully",
+    "alreadyExists": "User with this email already exists"
+  },
+  "notification": {
+    "newLoad": "New Load Created",
+    "loadAssigned": "Load Assigned to You",
+    "loadAccepted": "Load Accepted",
+    "loadRejected": "Load Rejected",
+    "loadCompleted": "Load Completed",
+    "documentsUploaded": "Documents Uploaded",
+    "newLoadMessage": "A new load has been created",
+    "loadAssignedMessage": "has assigned you a new load",
+    "loadAcceptedMessage": "has accepted load",
+    "loadRejectedMessage": "has rejected load",
+    "loadCompletedMessage": "has completed load",
+    "documentsUploadedMessage": "has uploaded documents for load"
+  },
+  "validation": {
+    "nameRequired": "Please provide name",
+    "emailRequired": "Please provide email",
+    "phoneRequired": "Please provide phone",
+    "passwordRequired": "Please provide password",
+    "pickupRequired": "Please add pickup location",
+    "dropoffRequired": "Please add dropoff location",
+    "clientNameRequired": "Please add client name",
+    "clientPriceRequired": "Please add client price",
+    "loadingDateRequired": "Please add loading date",
+    "loadingTimeRequired": "Please add loading time",
+    "imageRequired": "Please provide an image",
+    "driverIdRequired": "Please provide driver ID"
+  }
+}

@@ -4,7 +4,7 @@ const { getIO, isUserOnline } = require('../config/socket');
 /**
  * Create and send notification
  */
-const createNotification = async ({ userId, type, title, message, loadId, loadNumber }) => {
+const createNotification = async ({ userId, type, title, message, titleKey, messageKey, params = {}, loadId, loadNumber }) => {
   try {
     // Save to database
     const notification = await Notification.create({
@@ -12,6 +12,9 @@ const createNotification = async ({ userId, type, title, message, loadId, loadNu
       type,
       title,
       message,
+      titleKey,
+      messageKey,
+      params,
       loadId,
       loadNumber
     });
@@ -24,6 +27,9 @@ const createNotification = async ({ userId, type, title, message, loadId, loadNu
         type: notification.type,
         title: notification.title,
         message: notification.message,
+        titleKey: notification.titleKey,
+        messageKey: notification.messageKey,
+        params: notification.params,
         loadId: notification.loadId,
         loadNumber: notification.loadNumber,
         read: notification.read,
@@ -42,13 +48,21 @@ const createNotification = async ({ userId, type, title, message, loadId, loadNu
  * Notify manager about new load
  */
 const notifyManagerNewLoad = async (managerId, load) => {
+  const loadNum = load._id.toString().slice(-8).toUpperCase();
   return createNotification({
     userId: managerId,
     type: 'load_created',
     title: 'New Load Created',
-    message: `Load #${load._id.toString().slice(-8).toUpperCase()} from ${load.pickupLocation} to ${load.dropoffLocation} has been created`,
+    message: `Load #${loadNum} from ${load.pickupLocation} to ${load.dropoffLocation} has been created`,
+    titleKey: 'notifications.newLoad',
+    messageKey: 'notifications.newLoadCreated',
+    params: {
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
+    },
     loadId: load._id,
-    loadNumber: load._id.toString().slice(-8).toUpperCase()
+    loadNumber: loadNum
   });
 };
 
@@ -56,13 +70,21 @@ const notifyManagerNewLoad = async (managerId, load) => {
  * Notify driver about load assignment
  */
 const notifyDriverLoadAssigned = async (driverId, load) => {
+  const loadNum = load._id.toString().slice(-8).toUpperCase();
   return createNotification({
     userId: driverId,
     type: 'load_assigned',
     title: 'New Load Assigned',
-    message: `You have been assigned load #${load._id.toString().slice(-8).toUpperCase()} from ${load.pickupLocation} to ${load.dropoffLocation}`,
+    message: `You have been assigned load #${loadNum} from ${load.pickupLocation} to ${load.dropoffLocation}`,
+    titleKey: 'notifications.loadAssigned',
+    messageKey: 'notifications.loadAssignedToYou',
+    params: {
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
+    },
     loadId: load._id,
-    loadNumber: load._id.toString().slice(-8).toUpperCase()
+    loadNumber: loadNum
   });
 };
 
@@ -70,13 +92,20 @@ const notifyDriverLoadAssigned = async (driverId, load) => {
  * Notify manager about load acceptance
  */
 const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
+  const loadNum = load._id.toString().slice(-8).toUpperCase();
   return createNotification({
     userId: managerId,
     type: 'load_accepted',
     title: 'Load Accepted',
-    message: `${driverName} accepted load #${load._id.toString().slice(-8).toUpperCase()}`,
+    message: `${driverName} accepted load #${loadNum}`,
+    titleKey: 'notifications.loadAccepted',
+    messageKey: 'notifications.driverAcceptedLoad',
+    params: {
+      driverName,
+      loadNumber: loadNum
+    },
     loadId: load._id,
-    loadNumber: load._id.toString().slice(-8).toUpperCase()
+    loadNumber: loadNum
   });
 };
 
@@ -84,13 +113,20 @@ const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
  * Notify manager about load rejection
  */
 const notifyManagerLoadRejected = async (managerId, load, driverName) => {
+  const loadNum = load._id.toString().slice(-8).toUpperCase();
   return createNotification({
     userId: managerId,
     type: 'load_rejected',
     title: 'Load Rejected',
-    message: `${driverName} rejected load #${load._id.toString().slice(-8).toUpperCase()}`,
+    message: `${driverName} rejected load #${loadNum}`,
+    titleKey: 'notifications.loadRejected',
+    messageKey: 'notifications.driverRejectedLoad',
+    params: {
+      driverName,
+      loadNumber: loadNum
+    },
     loadId: load._id,
-    loadNumber: load._id.toString().slice(-8).toUpperCase()
+    loadNumber: loadNum
   });
 };
 
@@ -98,13 +134,20 @@ const notifyManagerLoadRejected = async (managerId, load, driverName) => {
  * Notify manager about load completion
  */
 const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
+  const loadNum = load._id.toString().slice(-8).toUpperCase();
   return createNotification({
     userId: managerId,
     type: 'load_completed',
     title: 'Load Completed',
-    message: `${driverName} completed load #${load._id.toString().slice(-8).toUpperCase()}`,
+    message: `${driverName} completed load #${loadNum}`,
+    titleKey: 'notifications.loadCompleted',
+    messageKey: 'notifications.driverCompletedLoad',
+    params: {
+      driverName,
+      loadNumber: loadNum
+    },
     loadId: load._id,
-    loadNumber: load._id.toString().slice(-8).toUpperCase()
+    loadNumber: loadNum
   });
 };
 
@@ -147,6 +190,27 @@ const getUnreadCount = async (userId) => {
 };
 
 /**
+ * Notify manager when driver uploads documents
+ */
+const notifyManagerDocumentsUploaded = async (managerId, load, driverName) => {
+  const loadNum = load.loadNumber || load._id.toString().slice(-8).toUpperCase();
+  return createNotification({
+    userId: managerId,
+    type: 'documents_uploaded',
+    title: 'Documents Uploaded',
+    message: `${driverName} has uploaded documents for load #${loadNum}`,
+    titleKey: 'notifications.documentsUploaded',
+    messageKey: 'notifications.driverUploadedDocuments',
+    params: {
+      driverName,
+      loadNumber: loadNum
+    },
+    loadId: load._id,
+    loadNumber: loadNum
+  });
+};
+
+/**
  * Delete notification
  */
 const deleteNotification = async (notificationId, userId) => {
@@ -160,6 +224,7 @@ module.exports = {
   notifyManagerLoadAccepted,
   notifyManagerLoadRejected,
   notifyManagerLoadCompleted,
+  notifyManagerDocumentsUploaded,
   getUserNotifications,
   markAsRead,
   markAllAsRead,

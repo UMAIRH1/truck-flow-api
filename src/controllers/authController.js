@@ -19,7 +19,7 @@ exports.login = async (req, res) => {
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
-                message: 'Please provide email and password',
+                message: req.t('validation.emailRequired') + ' and ' + req.t('validation.passwordRequired'),
             });
         }
 
@@ -29,7 +29,7 @@ exports.login = async (req, res) => {
         if (!user) {
             return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials',
+                message: req.t('auth.invalidCredentials'),
             });
         }
 
@@ -47,7 +47,7 @@ exports.login = async (req, res) => {
         if (!isMatch) {
             return res.status(401).json({
                 success: false,
-                message: 'Invalid credentials',
+                message: req.t('auth.invalidCredentials'),
             });
         }
 
