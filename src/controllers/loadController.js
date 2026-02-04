@@ -592,26 +592,45 @@ exports.uploadPOD = async (req, res) => {
 // @access  Private/Driver
 exports.uploadDocuments = async (req, res) => {
     try {
+        console.log('=== UPLOAD DOCUMENTS API ===');
+        console.log('Load ID:', req.params.id);
+        console.log('User:', req.user.name, req.user._id);
+        console.log('Request body:', JSON.stringify(req.body, null, 2));
+        
         const { invoices, documents } = req.body;
 
         if ((!invoices || invoices.length === 0) && (!documents || documents.length === 0)) {
+            console.log('❌ No files provided');
             return res.status(400).json({
                 success: false,
                 message: 'Please provide at least one invoice or document',
             });
         }
 
+        console.log('Files received:', {
+            invoiceCount: invoices?.length || 0,
+            documentCount: documents?.length || 0
+        });
+
         const load = await findLoadByIdOrNumber(req.params.id);
 
         if (!load) {
+            console.log('❌ Load not found');
             return res.status(404).json({
                 success: false,
                 message: 'Load not found',
             });
         }
 
+        console.log('Load found:', {
+            id: load._id,
+            status: load.status,
+            assignedDriver: load.assignedDriver
+        });
+
         // Check if load is assigned to this driver
         if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
+            console.log('❌ Load not assigned to this driver');
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
@@ -621,12 +640,21 @@ exports.uploadDocuments = async (req, res) => {
         // Update load with documents
         if (invoices && invoices.length > 0) {
             load.invoices = [...(load.invoices || []), ...invoices];
+            console.log('✅ Added invoices:', invoices.length);
         }
         if (documents && documents.length > 0) {
             load.documents = [...(load.documents || []), ...documents];
+            console.log('✅ Added documents:', documents.length);
         }
 
+        // Mark load as completed when documents are uploaded
+        const oldStatus = load.status;
+        load.status = 'completed';
+        load.completedAt = new Date();
+        console.log('✅ Status changed:', oldStatus, '→', load.status);
+
         await load.save();
+        console.log('✅ Load saved successfully');
 
         // Populate load to get manager info
         await load.populate('createdBy', 'name email');
@@ -639,17 +667,19 @@ exports.uploadDocuments = async (req, res) => {
                 load,
                 req.user.name
             );
+            console.log('✅ Notification sent to manager');
         } catch (notifError) {
-            console.error('Error sending notification:', notifError);
+            console.error('⚠️ Error sending notification:', notifError);
         }
 
+        console.log('✅ Sending success response');
         res.status(200).json({
             success: true,
             message: 'Documents uploaded successfully',
             load,
         });
     } catch (err) {
-        console.error(err);
+        console.error('❌ Server error:', err);
         res.status(500).json({ success: false, message: 'Server error' });
     }
 };

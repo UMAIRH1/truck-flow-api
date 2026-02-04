@@ -97,12 +97,14 @@ const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
     userId: managerId,
     type: 'load_accepted',
     title: 'Load Accepted',
-    message: `${driverName} accepted load #${loadNum}`,
+    message: `${driverName} accepted load #${loadNum} (${load.pickupLocation} → ${load.dropoffLocation})`,
     titleKey: 'notifications.loadAccepted',
-    messageKey: 'notifications.driverAcceptedLoad',
+    messageKey: 'notifications.driverAcceptedLoadDetails',
     params: {
       driverName,
-      loadNumber: loadNum
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
     },
     loadId: load._id,
     loadNumber: loadNum
@@ -118,12 +120,14 @@ const notifyManagerLoadRejected = async (managerId, load, driverName) => {
     userId: managerId,
     type: 'load_rejected',
     title: 'Load Rejected',
-    message: `${driverName} rejected load #${loadNum}`,
+    message: `${driverName} rejected load #${loadNum} (${load.pickupLocation} → ${load.dropoffLocation})`,
     titleKey: 'notifications.loadRejected',
-    messageKey: 'notifications.driverRejectedLoad',
+    messageKey: 'notifications.driverRejectedLoadDetails',
     params: {
       driverName,
-      loadNumber: loadNum
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
     },
     loadId: load._id,
     loadNumber: loadNum
@@ -139,12 +143,14 @@ const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
     userId: managerId,
     type: 'load_completed',
     title: 'Load Completed',
-    message: `${driverName} completed load #${loadNum}`,
+    message: `${driverName} completed load #${loadNum} (${load.pickupLocation} → ${load.dropoffLocation})`,
     titleKey: 'notifications.loadCompleted',
-    messageKey: 'notifications.driverCompletedLoad',
+    messageKey: 'notifications.driverCompletedLoadDetails',
     params: {
       driverName,
-      loadNumber: loadNum
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
     },
     loadId: load._id,
     loadNumber: loadNum
@@ -198,12 +204,14 @@ const notifyManagerDocumentsUploaded = async (managerId, load, driverName) => {
     userId: managerId,
     type: 'documents_uploaded',
     title: 'Documents Uploaded',
-    message: `${driverName} has uploaded documents for load #${loadNum}`,
+    message: `${driverName} has uploaded documents for load #${loadNum} (${load.pickupLocation} → ${load.dropoffLocation})`,
     titleKey: 'notifications.documentsUploaded',
-    messageKey: 'notifications.driverUploadedDocuments',
+    messageKey: 'notifications.driverUploadedDocumentsDetails',
     params: {
       driverName,
-      loadNumber: loadNum
+      loadNumber: loadNum,
+      pickup: load.pickupLocation,
+      dropoff: load.dropoffLocation
     },
     loadId: load._id,
     loadNumber: loadNum
