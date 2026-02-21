@@ -1,10 +1,10 @@
 const nodemailer = require('nodemailer');
 
 // Create transporter with timeout
-const createTransporter = () => {
-  return nodemailer.createTransporter({
+const createTransporter = async () => {
+  const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: process.env.SMTP_PORT || 587,
+    port: parseInt(process.env.SMTP_PORT) || 587,
     secure: false, // true for 465, false for other ports
     auth: {
       user: process.env.SMTP_USER,
@@ -14,6 +14,7 @@ const createTransporter = () => {
     greetingTimeout: 10000,
     socketTimeout: 10000,
   });
+  return transporter;
 };
 
 /**
@@ -21,7 +22,7 @@ const createTransporter = () => {
  */
 const sendPasswordResetOTP = async (email, otp, name) => {
   try {
-    const transporter = createTransporter();
+    const transporter = await createTransporter();
 
     const mailOptions = {
       from: `"TruckFlow" <${process.env.SMTP_USER}>`,
@@ -84,7 +85,7 @@ const sendPasswordResetOTP = async (email, otp, name) => {
  */
 const sendDriverInvitation = async (email, name, token) => {
   try {
-    const transporter = createTransporter();
+    const transporter = await createTransporter();
     const setupLink = `${process.env.FRONTEND_URL}/auth/setup-password?token=${token}`;
 
     const mailOptions = {
