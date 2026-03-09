@@ -10,6 +10,8 @@ const {
     declineLoad,
     uploadPOD,
     uploadDocuments,
+    calculateDistance,
+    calculateCosts,
 } = require('../controllers/loadController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -33,5 +35,9 @@ router.post('/:id/documents', authorize('driver'), uploadDocuments);
 // Both manager and driver (with role-based filtering in controller)
 router.get('/', getLoads);
 router.get('/:id', getLoad);
+
+// Calculate distance and costs (manager only)
+router.post('/calculate-distance', authorize('manager'), calculateDistance);
+router.post('/calculate-costs', authorize('manager'), calculateCosts);
 
 module.exports = router;

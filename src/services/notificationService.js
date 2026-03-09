@@ -225,6 +225,68 @@ const deleteNotification = async (notificationId, userId) => {
   return Notification.findOneAndDelete({ _id: notificationId, userId });
 };
 
+/**
+ * Notify driver about route assignment
+ */
+const notifyDriverRouteAssigned = async (driverId, route) => {
+  return createNotification({
+    userId: driverId,
+    type: 'route_assigned',
+    title: 'New Route Assigned',
+    message: `You have been assigned to route: ${route.routeName}`,
+    titleKey: 'notifications.routeAssigned',
+    messageKey: 'notifications.routeAssignedToYou',
+    params: {
+      routeName: route.routeName,
+      routeNumber: route.routeNumber
+    },
+    loadId: route._id,
+    loadNumber: route.routeNumber
+  });
+};
+
+/**
+ * Notify manager about route acceptance
+ */
+const notifyManagerRouteAccepted = async (managerId, route, driverName) => {
+  return createNotification({
+    userId: managerId,
+    type: 'route_accepted',
+    title: 'Route Accepted',
+    message: `${driverName} accepted route: ${route.routeName}`,
+    titleKey: 'notifications.routeAccepted',
+    messageKey: 'notifications.driverAcceptedRoute',
+    params: {
+      driverName,
+      routeName: route.routeName,
+      routeNumber: route.routeNumber
+    },
+    loadId: route._id,
+    loadNumber: route.routeNumber
+  });
+};
+
+/**
+ * Notify manager about route rejection
+ */
+const notifyManagerRouteRejected = async (managerId, route, driverName) => {
+  return createNotification({
+    userId: managerId,
+    type: 'route_rejected',
+    title: 'Route Rejected',
+    message: `${driverName} rejected route: ${route.routeName}`,
+    titleKey: 'notifications.routeRejected',
+    messageKey: 'notifications.driverRejectedRoute',
+    params: {
+      driverName,
+      routeName: route.routeName,
+      routeNumber: route.routeNumber
+    },
+    loadId: route._id,
+    loadNumber: route.routeNumber
+  });
+};
+
 module.exports = {
   createNotification,
   notifyManagerNewLoad,
@@ -233,6 +295,9 @@ module.exports = {
   notifyManagerLoadRejected,
   notifyManagerLoadCompleted,
   notifyManagerDocumentsUploaded,
+  notifyDriverRouteAssigned,
+  notifyManagerRouteAccepted,
+  notifyManagerRouteRejected,
   getUserNotifications,
   markAsRead,
   markAllAsRead,

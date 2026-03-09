@@ -48,6 +48,7 @@ const seedRoutes = require('./routes/seedRoutes');
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/loads', loadRoutes);
+app.use('/api/routes', require('./routes/routeRoutes'));
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/exports', exportRoutes);
 app.use('/api/upload', uploadRoutes);

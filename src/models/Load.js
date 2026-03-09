@@ -14,6 +14,60 @@ const loadSchema = mongoose.Schema(
             trim: true,
         },
 
+        // Distance information
+        distance: {
+            type: Number,
+            default: 0,
+        },
+        distanceUnit: {
+            type: String,
+            default: 'km',
+        },
+
+        // Cost Model Fields
+        fuelConsumption: {
+            type: Number,
+            default: 30, // liters per 100km (default for trucks)
+        },
+        fuelPricePerLiter: {
+            type: Number,
+            default: 0,
+        },
+        driverDailyCost: {
+            type: Number,
+            default: 0,
+        },
+        truckCostPerKm: {
+            type: Number,
+            default: 0,
+        },
+
+        // Calculated Costs
+        fuelCost: {
+            type: Number,
+            default: 0,
+        },
+        driverCost: {
+            type: Number,
+            default: 0,
+        },
+        truckCost: {
+            type: Number,
+            default: 0,
+        },
+        totalCost: {
+            type: Number,
+            default: 0,
+        },
+        profit: {
+            type: Number,
+            default: 0,
+        },
+        profitPerKm: {
+            type: Number,
+            default: 0,
+        },
+
         // Client information
         clientName: {
             type: String,
@@ -35,6 +89,12 @@ const loadSchema = mongoose.Schema(
         assignedDriver: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
+        },
+
+        // Route reference (if load is part of a route)
+        routeId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Route',
         },
 
         // Load details
@@ -138,6 +198,40 @@ const loadSchema = mongoose.Schema(
 loadSchema.index({ status: 1, createdBy: 1 });
 loadSchema.index({ assignedDriver: 1, status: 1 });
 loadSchema.index({ createdAt: -1 });
+
+// Pre-save middleware to calculate costs
+loadSchema.pre('save', function(next) {
+    // Only calculate if we have distance
+    if (this.distance > 0) {
+        // Calculate fuel cost: distance × consumption / 100 × fuel_price
+        this.fuelCost = (this.distance * this.fuelConsumption / 100) * this.fuelPricePerLiter;
+
+        // Driver cost is daily cost (already set)
+        this.driverCost = this.driverDailyCost || 0;
+
+        // Truck cost: distance × cost_per_km
+        this.truckCost = this.distance * this.truckCostPerKm;
+
+        // Total cost: fuel + driver + truck + tolls + other expenses
+        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + 
+                        (this.tolls || 0) + (this.otherExpenses || 0);
+
+        // Profit: revenue (clientPrice) - total_cost
+        this.profit = (this.clientPrice || 0) - this.totalCost;
+
+        // Profit per km
+        this.profitPerKm = this.distance > 0 ? this.profit / this.distance : 0;
+
+        // Round to 2 decimal places
+        this.fuelCost = Math.round(this.fuelCost * 100) / 100;
+        this.driverCost = Math.round(this.driverCost * 100) / 100;
+        this.truckCost = Math.round(this.truckCost * 100) / 100;
+        this.totalCost = Math.round(this.totalCost * 100) / 100;
+        this.profit = Math.round(this.profit * 100) / 100;
+        this.profitPerKm = Math.round(this.profitPerKm * 100) / 100;
+    }
+    next();
+});
 
 // Virtual for load number (using _id)
 loadSchema.virtual('loadNumber').get(function() {

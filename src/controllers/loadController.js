@@ -1,6 +1,7 @@
 const Load = require('../models/Load');
 const { convertToBase64, validateImageFile } = require('../services/uploadService');
 const notificationService = require('../services/notificationService');
+const { calculateRouteDistance } = require('../services/geocodeService');
 
 // @desc    Create load (manager only)
 // @route   POST /api/loads
@@ -63,11 +64,25 @@ exports.createLoad = async (req, res) => {
             calculatedPayoutDate.setDate(calculatedPayoutDate.getDate() + paymentTerms);
         }
 
+        // Calculate distance between pickup and dropoff
+        let distanceData = { distance: 0, unit: 'km', duration: null };
+        try {
+            console.log('🔄 Calculating distance...');
+            distanceData = await calculateRouteDistance(pickupLocation, dropoffLocation);
+            console.log(`✅ Distance calculated: ${distanceData.distance} ${distanceData.unit}`);
+        } catch (distanceError) {
+            console.error('⚠️ Distance calculation failed:', distanceError.message);
+            // Continue without distance - load creation should not fail
+            // Distance can be calculated later or manually entered
+        }
+
         // Create load with all fields matching UI
         const loadData = {
             createdBy: req.user._id,
             pickupLocation,
             dropoffLocation,
+            distance: distanceData.distance,
+            distanceUnit: distanceData.unit,
             clientName,
             clientPrice,
             driverPrice: driverPrice || 0,
@@ -83,6 +98,12 @@ exports.createLoad = async (req, res) => {
             otherExpenses: otherExpenses || 0,
             notes: notes || '',
             status: 'pending',
+            
+            // Cost model fields (with defaults)
+            fuelConsumption: req.body.fuelConsumption || 30,
+            fuelPricePerLiter: req.body.fuelPricePerLiter || 0,
+            driverDailyCost: req.body.driverDailyCost || 0,
+            truckCostPerKm: req.body.truckCostPerKm || 0,
         };
 
         // Add driver if provided
@@ -681,5 +702,88 @@ exports.uploadDocuments = async (req, res) => {
     } catch (err) {
         console.error('❌ Server error:', err);
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
+
+// @desc    Calculate distance between two locations
+// @route   POST /api/loads/calculate-distance
+// @access  Private/Manager
+exports.calculateDistance = async (req, res) => {
+    try {
+        const { pickupLocation, dropoffLocation } = req.body;
+
+        if (!pickupLocation || !dropoffLocation) {
+            return res.status(400).json({
+                success: false,
+                message: 'Both pickup and dropoff locations are required',
+            });
+        }
+
+        const distanceData = await calculateRouteDistance(pickupLocation, dropoffLocation);
+
+        res.status(200).json({
+            success: true,
+            distance: distanceData.distance,
+            unit: distanceData.unit,
+            pickup: distanceData.pickup,
+            dropoff: distanceData.dropoff,
+        });
+    } catch (err) {
+        console.error('Distance calculation error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: err.message || 'Failed to calculate distance' 
+        });
+    }
+};
+
+// @desc    Calculate cost breakdown for a route
+// @route   POST /api/loads/calculate-costs
+// @access  Private/Manager
+exports.calculateCosts = async (req, res) => {
+    try {
+        const { 
+            distance,
+            clientPrice,
+            fuelConsumption = 30,
+            fuelPricePerLiter = 0,
+            driverDailyCost = 0,
+            truckCostPerKm = 0,
+            tolls = 0,
+            otherExpenses = 0
+        } = req.body;
+
+        if (!distance || !clientPrice) {
+            return res.status(400).json({
+                success: false,
+                message: 'Distance and client price are required',
+            });
+        }
+
+        // Calculate costs using the same formula as the model
+        const fuelCost = (distance * fuelConsumption / 100) * fuelPricePerLiter;
+        const driverCost = driverDailyCost;
+        const truckCost = distance * truckCostPerKm;
+        const totalCost = fuelCost + driverCost + truckCost + tolls + otherExpenses;
+        const profit = clientPrice - totalCost;
+        const profitPerKm = distance > 0 ? profit / distance : 0;
+
+        res.status(200).json({
+            success: true,
+            costs: {
+                fuelCost: Math.round(fuelCost * 100) / 100,
+                driverCost: Math.round(driverCost * 100) / 100,
+                truckCost: Math.round(truckCost * 100) / 100,
+                totalCost: Math.round(totalCost * 100) / 100,
+                profit: Math.round(profit * 100) / 100,
+                profitPerKm: Math.round(profitPerKm * 100) / 100,
+            },
+        });
+    } catch (err) {
+        console.error('Cost calculation error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: err.message || 'Failed to calculate costs' 
+        });
     }
 };
