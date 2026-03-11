@@ -53,7 +53,39 @@ exports.getManagerDashboard = async (req, res) => {
         });
         const pendingPayments = pendingPaymentsLoads.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
-        // --- Phase 2: Route-based KPIs ---
+        // --- Summary Workload Aggregation (Loads) ---
+        // We calculate core KPIs from the Loads directly to ensure stand-alone loads are counted.
+        // We use the 'completed' status to determine finalized revenue/profit.
+        const completedLoadsForStats = await Load.find({
+            createdBy: req.user._id,
+            status: 'completed'
+        }).populate('assignedDriver', 'name');
+
+        const totalLoadRevenue = completedLoadsForStats.reduce((sum, l) => sum + (l.clientPrice || 0), 0);
+        
+        // Use the 'profit' field calculated by the Load model pre-save hook
+        const totalLoadProfit = completedLoadsForStats.reduce((sum, l) => sum + (l.profit || 0), 0);
+        
+        // Sum total cost from loads
+        const totalLoadCost = completedLoadsForStats.reduce((sum, l) => sum + (l.totalCost || 0), 0);
+
+        // Calculate Profit per Driver from all completed loads
+        const profitPerDriver = completedLoadsForStats.reduce((acc, l) => {
+            if (l.assignedDriver) {
+                const driverId = l.assignedDriver._id.toString();
+                const driverName = l.assignedDriver.name || 'Unknown Driver';
+                if (!acc[driverId]) acc[driverId] = { name: driverName, profit: 0 };
+                acc[driverId].profit += (l.profit || 0);
+            }
+            return acc;
+        }, {});
+
+        // Round driver profits
+        Object.keys(profitPerDriver).forEach(id => {
+            profitPerDriver[id].profit = Math.round(profitPerDriver[id].profit * 100) / 100;
+        });
+
+        // --- Route-specific KPIs ---
         const completedRoutes = await Route.find({
             createdBy: req.user._id,
             status: 'completed'
@@ -66,29 +98,23 @@ exports.getManagerDashboard = async (req, res) => {
             date: r.updatedAt
         })).slice(0, 5);
 
-        const totalRevenue = completedRoutes.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
-        const totalCost = completedRoutes.reduce((sum, r) => sum + (r.totalCost || 0), 0);
-        const totalProfit = completedRoutes.reduce((sum, r) => sum + (r.profit || 0), 0);
-        const totalDistance = completedRoutes.reduce((sum, r) => sum + (r.totalDistance || 0), 0);
-
-        const avgRevenuePerKm = totalDistance > 0 ? totalRevenue / totalDistance : 0;
-        const avgProfitPerKm = totalDistance > 0 ? totalProfit / totalDistance : 0;
-
-        // Profit per Driver
-        const profitPerDriver = completedRoutes.reduce((acc, r) => {
-            const driverId = r.assignedDriver.toString();
-            if (!acc[driverId]) acc[driverId] = { name: '', profit: 0 };
-            acc[driverId].profit += (r.profit || 0);
-            return acc;
-        }, {});
-
-        // Profit per Truck
+        // Profit per Truck (Routes only for now as Load has no truck field)
         const profitPerTruck = completedRoutes.reduce((acc, r) => {
-            const truckNum = r.assignedTruck?.truckNumber || 'Unknown';
+            const truckNum = r.assignedTruck?.truckNumber || 'Unknown Truck';
             if (!acc[truckNum]) acc[truckNum] = 0;
             acc[truckNum] += (r.profit || 0);
             return acc;
         }, {});
+
+        // Round truck profits
+        Object.keys(profitPerTruck).forEach(num => {
+            profitPerTruck[num] = Math.round(profitPerTruck[num] * 100) / 100;
+        });
+
+        // Calculate Distance based KPIs (still route based for better precision)
+        const totalDistance = completedRoutes.reduce((sum, r) => sum + (r.totalDistance || 0), 0);
+        const avgRevenuePerKm = totalDistance > 0 ? totalLoadRevenue / totalDistance : 0;
+        const avgProfitPerKm = totalDistance > 0 ? totalLoadProfit / totalDistance : 0;
 
         res.status(200).json({
             success: true,
@@ -99,10 +125,10 @@ exports.getManagerDashboard = async (req, res) => {
                 completedLoads,
                 pendingLoads,
                 rejectedLoads,
-                totalIncome: totalRevenue, // Client wants "Total Revenue"
-                totalRevenue,
-                totalCost,
-                totalProfit,
+                totalIncome: totalLoadRevenue,
+                totalRevenue: totalLoadRevenue,
+                totalCost: totalLoadCost,
+                totalProfit: totalLoadProfit,
                 pendingPayments,
                 avgRevenuePerKm: Math.round(avgRevenuePerKm * 100) / 100,
                 avgProfitPerKm: Math.round(avgProfitPerKm * 100) / 100,

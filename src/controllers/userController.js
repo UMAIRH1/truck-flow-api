@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { sendDriverInvitation } = require('../services/emailService');
+const Load = require('../models/Load');
 
 // @desc    Create driver (manager only)
 // @route   POST /api/users
@@ -296,6 +297,66 @@ exports.updateProfile = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Update Profile Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error: ' + err.message, 
+            error: err.message 
+        });
+    }
+};
+
+// @desc    Get driver statistics (manager only)
+// @route   GET /api/users/:id/stats
+// @access  Private/Manager
+exports.getDriverStats = async (req, res) => {
+    try {
+        const driverId = req.params.id;
+
+        // Verify driver exists
+        const driver = await User.findOne({ _id: driverId, role: 'driver' }).select('-password');
+        if (!driver) {
+            return res.status(404).json({
+                success: false,
+                message: 'Driver not found',
+            });
+        }
+
+        // Aggregate load statistics
+        const loads = await Load.find({ assignedDriver: driverId });
+
+        const stats = {
+            totalLoads: loads.length,
+            completedLoads: loads.filter(l => l.status === 'completed').length,
+            rejectedLoads: loads.filter(l => l.status === 'rejected').length,
+            acceptedLoads: loads.filter(l => l.status === 'accepted').length,
+            inProgressLoads: loads.filter(l => l.status === 'in-progress').length,
+            pendingLoads: loads.filter(l => l.status === 'pending').length,
+            totalEarnings: loads
+                .filter(l => l.status === 'completed')
+                .reduce((sum, l) => sum + (l.driverPrice || 0), 0),
+            totalProfitGenerated: loads
+                .filter(l => l.status === 'completed')
+                .reduce((sum, l) => sum + (l.profit || 0), 0),
+            recentLoads: loads.sort((a, b) => b.createdAt - a.createdAt).slice(0, 5).map(l => ({
+                id: l._id,
+                pickupLocation: l.pickupLocation,
+                dropoffLocation: l.dropoffLocation,
+                clientName: l.clientName,
+                clientPrice: l.clientPrice,
+                loadWeight: l.loadWeight,
+                status: l.status,
+                loadingDate: l.loadingDate,
+                loadingTime: l.loadingTime
+            }))
+        };
+
+        res.status(200).json({
+            success: true,
+            driver,
+            stats
+        });
+    } catch (err) {
+        console.error('❌ Get Driver Stats Error:', err);
         res.status(500).json({ 
             success: false, 
             message: 'Server error: ' + err.message, 
