@@ -1,4 +1,5 @@
 const Load = require('../models/Load');
+const Route = require('../models/Route');
 
 // @desc    Get manager dashboard stats
 // @route   GET /api/dashboard/manager
@@ -39,12 +40,49 @@ exports.getManagerDashboard = async (req, res) => {
         });
         const totalIncome = completedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
-        // Pending payments (accepted but not completed)
+        // Accepted loadsList for pending payments calculation
         const acceptedLoadsList = await Load.find({
             createdBy: req.user._id,
             status: 'accepted',
         });
         const pendingPayments = acceptedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
+
+        // --- Phase 2: Route-based KPIs ---
+        const completedRoutes = await Route.find({
+            createdBy: req.user._id,
+            status: 'completed'
+        }).sort({ updatedAt: -1 });
+
+        const recentProfitRoutes = (completedRoutes || []).map(r => ({
+            id: r._id,
+            name: r.routeName,
+            profit: r.profit || 0,
+            date: r.updatedAt
+        })).slice(0, 5);
+
+        const totalRevenue = completedRoutes.reduce((sum, r) => sum + (r.totalRevenue || 0), 0);
+        const totalCost = completedRoutes.reduce((sum, r) => sum + (r.totalCost || 0), 0);
+        const totalProfit = completedRoutes.reduce((sum, r) => sum + (r.profit || 0), 0);
+        const totalDistance = completedRoutes.reduce((sum, r) => sum + (r.totalDistance || 0), 0);
+
+        const avgRevenuePerKm = totalDistance > 0 ? totalRevenue / totalDistance : 0;
+        const avgProfitPerKm = totalDistance > 0 ? totalProfit / totalDistance : 0;
+
+        // Profit per Driver
+        const profitPerDriver = completedRoutes.reduce((acc, r) => {
+            const driverId = r.assignedDriver.toString();
+            if (!acc[driverId]) acc[driverId] = { name: '', profit: 0 };
+            acc[driverId].profit += (r.profit || 0);
+            return acc;
+        }, {});
+
+        // Profit per Truck
+        const profitPerTruck = completedRoutes.reduce((acc, r) => {
+            const truckNum = r.assignedTruck?.truckNumber || 'Unknown';
+            if (!acc[truckNum]) acc[truckNum] = 0;
+            acc[truckNum] += (r.profit || 0);
+            return acc;
+        }, {});
 
         res.status(200).json({
             success: true,
@@ -54,8 +92,16 @@ exports.getManagerDashboard = async (req, res) => {
                 completedLoads,
                 pendingLoads,
                 rejectedLoads,
-                totalIncome,
+                totalIncome: totalRevenue, // Client wants "Total Revenue"
+                totalRevenue,
+                totalCost,
+                totalProfit,
                 pendingPayments,
+                avgRevenuePerKm: Math.round(avgRevenuePerKm * 100) / 100,
+                avgProfitPerKm: Math.round(avgProfitPerKm * 100) / 100,
+                profitPerDriver,
+                profitPerTruck,
+                recentProfitRoutes
             },
         });
     } catch (err) {

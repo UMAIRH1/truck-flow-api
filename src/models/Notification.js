@@ -9,7 +9,10 @@ const notificationSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['load_created', 'load_assigned', 'load_accepted', 'load_rejected', 'load_completed', 'load_cancelled', 'documents_uploaded'],
+    enum: [
+      'load_created', 'load_assigned', 'load_accepted', 'load_rejected', 'load_completed', 'load_cancelled', 'documents_uploaded',
+      'route_assigned', 'route_accepted', 'route_rejected'
+    ],
     required: true
   },
   title: {
@@ -35,6 +38,10 @@ const notificationSchema = new mongoose.Schema({
   loadId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Load'
+  },
+  routeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Route'
   },
   loadNumber: {
     type: String

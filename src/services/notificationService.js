@@ -4,7 +4,7 @@ const { getIO, isUserOnline } = require('../config/socket');
 /**
  * Create and send notification
  */
-const createNotification = async ({ userId, type, title, message, titleKey, messageKey, params = {}, loadId, loadNumber }) => {
+const createNotification = async ({ userId, type, title, message, titleKey, messageKey, params = {}, loadId, routeId, loadNumber }) => {
   try {
     // Save to database
     const notification = await Notification.create({
@@ -16,9 +16,10 @@ const createNotification = async ({ userId, type, title, message, titleKey, mess
       messageKey,
       params,
       loadId,
+      routeId,
       loadNumber
     });
-
+    
     // Send real-time notification if user is online
     if (isUserOnline(userId)) {
       const io = getIO();
@@ -31,6 +32,7 @@ const createNotification = async ({ userId, type, title, message, titleKey, mess
         messageKey: notification.messageKey,
         params: notification.params,
         loadId: notification.loadId,
+        routeId: notification.routeId,
         loadNumber: notification.loadNumber,
         read: notification.read,
         createdAt: notification.createdAt
@@ -240,7 +242,7 @@ const notifyDriverRouteAssigned = async (driverId, route) => {
       routeName: route.routeName,
       routeNumber: route.routeNumber
     },
-    loadId: route._id,
+    routeId: route._id,
     loadNumber: route.routeNumber
   });
 };
@@ -261,7 +263,7 @@ const notifyManagerRouteAccepted = async (managerId, route, driverName) => {
       routeName: route.routeName,
       routeNumber: route.routeNumber
     },
-    loadId: route._id,
+    routeId: route._id,
     loadNumber: route.routeNumber
   });
 };
@@ -282,7 +284,7 @@ const notifyManagerRouteRejected = async (managerId, route, driverName) => {
       routeName: route.routeName,
       routeNumber: route.routeNumber
     },
-    loadId: route._id,
+    routeId: route._id,
     loadNumber: route.routeNumber
   });
 };
