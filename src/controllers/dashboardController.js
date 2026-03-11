@@ -27,6 +27,12 @@ exports.getManagerDashboard = async (req, res) => {
             status: 'pending',
         });
 
+        // In Progress loads
+        const inProgressLoads = await Load.countDocuments({
+            createdBy: req.user._id,
+            status: 'in-progress',
+        });
+
         // Rejected loads
         const rejectedLoads = await Load.countDocuments({
             createdBy: req.user._id,
@@ -40,12 +46,12 @@ exports.getManagerDashboard = async (req, res) => {
         });
         const totalIncome = completedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
-        // Accepted loadsList for pending payments calculation
-        const acceptedLoadsList = await Load.find({
+        // Accepted/In-progress loadsList for pending payments calculation
+        const pendingPaymentsLoads = await Load.find({
             createdBy: req.user._id,
-            status: 'accepted',
+            status: { $in: ['accepted', 'in-progress'] },
         });
-        const pendingPayments = acceptedLoadsList.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
+        const pendingPayments = pendingPaymentsLoads.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
 
         // --- Phase 2: Route-based KPIs ---
         const completedRoutes = await Route.find({
@@ -89,6 +95,7 @@ exports.getManagerDashboard = async (req, res) => {
             dashboard: {
                 totalLoads,
                 acceptedLoads,
+                inProgressLoads,
                 completedLoads,
                 pendingLoads,
                 rejectedLoads,
@@ -131,6 +138,12 @@ exports.getDriverDashboard = async (req, res) => {
             status: 'accepted',
         });
 
+        // In Progress loads
+        const inProgressLoads = await Load.countDocuments({
+            assignedDriver: req.user._id,
+            status: 'in-progress',
+        });
+
         // Completed loads
         const completedLoads = await Load.countDocuments({
             assignedDriver: req.user._id,
@@ -150,18 +163,19 @@ exports.getDriverDashboard = async (req, res) => {
         });
         const totalEarnings = completedLoadsList.reduce((sum, load) => sum + (load.driverPrice || 0), 0);
 
-        // Pending earnings (accepted but not completed)
-        const acceptedLoadsList = await Load.find({
+        // Pending earnings (accepted/in-progress but not completed)
+        const pendingEarningsLoads = await Load.find({
             assignedDriver: req.user._id,
-            status: 'accepted',
+            status: { $in: ['accepted', 'in-progress'] },
         });
-        const pendingEarnings = acceptedLoadsList.reduce((sum, load) => sum + (load.driverPrice || 0), 0);
+        const pendingEarnings = pendingEarningsLoads.reduce((sum, load) => sum + (load.driverPrice || 0), 0);
 
         res.status(200).json({
             success: true,
             dashboard: {
                 assignedLoads,
                 acceptedLoads,
+                inProgressLoads,
                 completedLoads,
                 rejectedLoads,
                 totalEarnings,
