@@ -523,6 +523,72 @@ exports.declineLoad = async (req, res) => {
     }
 };
 
+// @desc    Start load journey (driver only)
+// @route   PATCH /api/loads/:id/start
+// @access  Private/Driver
+exports.startLoad = async (req, res) => {
+    try {
+        const load = await findLoadByIdOrNumber(req.params.id);
+
+        if (!load) {
+            return res.status(404).json({
+                success: false,
+                message: 'Load not found',
+            });
+        }
+
+        // Check if load is assigned to this driver
+        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'This load is not assigned to you',
+            });
+        }
+
+        // Check if load is in accepted status
+        if (load.status !== 'accepted') {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot start a load with status '${load.status}'. It must be 'accepted' first.`,
+            });
+        }
+
+        load.status = 'in-progress';
+        
+        // Add to timeline
+        load.timeline.push({
+            status: 'in-progress',
+            timestamp: new Date(),
+            note: `Journey started by driver ${req.user.name}`
+        });
+
+        await load.save();
+
+        // Populate load to get manager info
+        await load.populate('createdBy', 'name email');
+        await load.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerLoadInTransit(
+                load.createdBy._id,
+                load,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Load journey started successfully',
+            load,
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+};
 
 // @desc    Upload POD (Proof of Delivery) image (driver only)
 // @route   POST /api/loads/:id/pod

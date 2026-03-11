@@ -10,6 +10,7 @@ const {
     declineLoad,
     uploadPOD,
     uploadDocuments,
+    startLoad,
     calculateDistance,
     calculateCosts,
 } = require('../controllers/loadController');
@@ -29,6 +30,7 @@ router.patch('/:id/assign', authorize('manager'), assignDriver);
 // Driver only routes
 router.patch('/:id/accept', authorize('driver'), acceptLoad);
 router.patch('/:id/decline', authorize('driver'), declineLoad);
+router.patch('/:id/start', authorize('driver'), startLoad);
 router.post('/:id/pod', authorize('driver'), uploadPOD);
 router.post('/:id/documents', authorize('driver'), uploadDocuments);
 

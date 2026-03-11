@@ -149,7 +149,7 @@ const loadSchema = mongoose.Schema(
         // Status
         status: {
             type: String,
-            enum: ['pending', 'accepted', 'rejected', 'in-transit', 'delivered', 'completed'],
+            enum: ['pending', 'accepted', 'rejected', 'in-progress', 'in-transit', 'delivered', 'completed'],
             default: 'pending',
         },
 
