@@ -86,7 +86,7 @@ exports.createDriver = async (req, res) => {
         console.error('❌ Create Driver Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -110,7 +110,7 @@ exports.getDrivers = async (req, res) => {
         console.error('❌ Get Drivers Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -148,7 +148,7 @@ exports.getDriver = async (req, res) => {
         console.error('❌ Get Driver Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -196,7 +196,7 @@ exports.toggleDriverStatus = async (req, res) => {
         console.error('❌ Toggle Driver Status Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -236,7 +236,7 @@ exports.deleteDriver = async (req, res) => {
         console.error('❌ Delete Driver Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -298,7 +298,7 @@ exports.updateProfile = async (req, res) => {
         console.error('❌ Update Profile Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }

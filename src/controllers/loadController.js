@@ -186,7 +186,7 @@ exports.getLoads = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -253,7 +253,11 @@ exports.getLoad = async (req, res) => {
                 message: 'Load not found',
             });
         }
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error: ' + err.message,
+            error: err.message
+        });
     }
 };
 
@@ -331,7 +335,7 @@ exports.updateLoad = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -365,7 +369,11 @@ exports.deleteLoad = async (req, res) => {
                 message: 'Load not found',
             });
         }
-        res.status(500).json({ success: false, message: 'Server error' });
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error: ' + err.message,
+            error: err.message
+        });
     }
 };
 
@@ -424,7 +432,7 @@ exports.assignDriver = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -487,7 +495,7 @@ exports.acceptLoad = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -550,7 +558,7 @@ exports.declineLoad = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -621,7 +629,7 @@ exports.startLoad = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -709,7 +717,7 @@ exports.uploadPOD = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -807,10 +815,10 @@ exports.uploadDocuments = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error('❌ API Error:', err);
+        console.error('❌ API Error (uploadDocuments):', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }

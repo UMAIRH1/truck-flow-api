@@ -95,7 +95,7 @@ const createRoute = async (req, res) => {
         console.error('❌ Create Route Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -136,7 +136,7 @@ const getRoutes = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -176,7 +176,7 @@ const getRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -239,7 +239,7 @@ const updateRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -275,7 +275,7 @@ const deleteRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -339,7 +339,7 @@ const addLoadsToRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -390,7 +390,7 @@ const removeLoadFromRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -452,7 +452,7 @@ const acceptRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -513,7 +513,7 @@ const rejectRoute = async (req, res) => {
         console.error('❌ API Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }

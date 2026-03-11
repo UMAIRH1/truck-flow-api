@@ -72,7 +72,7 @@ exports.login = async (req, res) => {
         console.error('❌ Login Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -101,7 +101,7 @@ exports.getMe = async (req, res) => {
         console.error('❌ Get Me Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -153,7 +153,7 @@ exports.refreshToken = async (req, res) => {
         console.error('❌ Refresh Token Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }

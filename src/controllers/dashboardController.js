@@ -115,7 +115,7 @@ exports.getManagerDashboard = async (req, res) => {
         console.error('❌ Manager Dashboard Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
@@ -186,7 +186,7 @@ exports.getDriverDashboard = async (req, res) => {
         console.error('❌ Driver Dashboard Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
+            message: 'Server error: ' + err.message, 
             error: err.message 
         });
     }
