@@ -158,9 +158,6 @@ const loadSchema = mongoose.Schema(
             type: String,
             trim: true,
         },
-        podImage: {
-            type: String,
-        },
         podImages: [{
             type: String,
         }],
@@ -201,35 +198,48 @@ loadSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate costs
 loadSchema.pre('save', function(next) {
-    // Only calculate if we have distance
-    if (this.distance > 0) {
-        // Calculate fuel cost: distance × consumption / 100 × fuel_price
-        this.fuelCost = (this.distance * this.fuelConsumption / 100) * this.fuelPricePerLiter;
-
-        // Driver cost is daily cost (already set)
-        this.driverCost = this.driverDailyCost || 0;
-
-        // Truck cost: distance × cost_per_km
-        this.truckCost = this.distance * this.truckCostPerKm;
-
-        // Total cost: fuel + driver + truck + tolls + other expenses
-        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + 
-                        (this.tolls || 0) + (this.otherExpenses || 0);
-
-        // Profit: revenue (clientPrice) - total_cost
-        this.profit = (this.clientPrice || 0) - this.totalCost;
-
-        // Profit per km
-        this.profitPerKm = this.distance > 0 ? this.profit / this.distance : 0;
-
-        // Round to 2 decimal places
-        this.fuelCost = Math.round(this.fuelCost * 100) / 100;
-        this.driverCost = Math.round(this.driverCost * 100) / 100;
-        this.truckCost = Math.round(this.truckCost * 100) / 100;
-        this.totalCost = Math.round(this.totalCost * 100) / 100;
-        this.profit = Math.round(this.profit * 100) / 100;
-        this.profitPerKm = Math.round(this.profitPerKm * 100) / 100;
+    // 1. Calculate Fuel Cost (if distance > 0)
+    if (this.distance > 0 && this.fuelConsumption > 0) {
+        this.fuelCost = (this.distance * this.fuelConsumption / 100) * (this.fuelPricePerLiter || 0);
+    } else {
+        this.fuelCost = 0;
     }
+
+    // 2. Calculate Driver Cost (Use assigned driver price or daily cost)
+    // If a specific price is set for this load (driverPrice), use that.
+    // Otherwise fall back to daily cost.
+    this.driverCost = (this.driverPrice > 0) ? this.driverPrice : (this.driverDailyCost || 0);
+
+    // 3. Calculate Truck Cost
+    if (this.distance > 0 && this.truckCostPerKm > 0) {
+        this.truckCost = this.distance * this.truckCostPerKm;
+    } else {
+        this.truckCost = 0;
+    }
+
+    // 4. Sum everything (Total Cost)
+    // Include manual expenses (fuel, tolls, otherExpenses) and calculated costs
+    this.totalCost = this.fuelCost + 
+                    this.driverCost + 
+                    this.truckCost + 
+                    (this.tolls || 0) + 
+                    (this.fuel || 0) + // Include manual fuel expense if added
+                    (this.otherExpenses || 0);
+
+    // 5. Calculate Profit
+    this.profit = (this.clientPrice || 0) - this.totalCost;
+
+    // 6. Profit per km
+    this.profitPerKm = this.distance > 0 ? this.profit / this.distance : 0;
+
+    // Rounding
+    this.fuelCost = Math.round(this.fuelCost * 100) / 100;
+    this.driverCost = Math.round(this.driverCost * 100) / 100;
+    this.truckCost = Math.round(this.truckCost * 100) / 100;
+    this.totalCost = Math.round(this.totalCost * 100) / 100;
+    this.profit = Math.round(this.profit * 100) / 100;
+    this.profitPerKm = Math.round(this.profitPerKm * 100) / 100;
+
     next();
 });
 

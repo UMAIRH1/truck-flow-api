@@ -28,6 +28,14 @@ exports.createLoad = async (req, res) => {
             driverId
         } = req.body;
 
+        // Safety check for user (should be handled by middleware)
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Authenticate as a manager to create loads',
+            });
+        }
+
         // Validate required fields
         if (!pickupLocation || !dropoffLocation) {
             return res.status(400).json({
