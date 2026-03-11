@@ -58,6 +58,16 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/seed', seedRoutes); // Public seed endpoint
 
+// Public test endpoint to verify update
+app.get('/api/test', (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: 'Backend is UPDATED and running the latest code!',
+        version: '1.1.0-manual-sync-test',
+        timestamp: new Date().toISOString(),
+    });
+});
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
     res.status(200).json({
