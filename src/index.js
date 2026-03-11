@@ -75,6 +75,17 @@ app.use((req, res) => {
     });
 });
 
+// Global error handler
+app.use((err, req, res, next) => {
+    console.error('❌ GLOBAL ERROR:', err);
+    res.status(err.status || 500).json({
+        success: false,
+        message: 'Server error: ' + err.message,
+        error: err.message,
+        stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
+});
+
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, () => {

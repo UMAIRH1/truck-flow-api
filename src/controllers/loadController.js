@@ -145,8 +145,9 @@ exports.createLoad = async (req, res) => {
         console.error('❌ Create Load Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Server error', 
-            error: err.message 
+            message: 'Server error: ' + err.message, 
+            error: err.message,
+            stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
         });
     }
 };
