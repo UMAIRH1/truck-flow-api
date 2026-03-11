@@ -143,14 +143,6 @@ exports.createLoad = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Create Load Error:', err);
-        
-        // ADDED FOR DEBUGGING
-        const fs = require('fs');
-        const path = require('path');
-        const logPath = path.join(__dirname, '../../debug_error.log');
-        const logMessage = `\n[${new Date().toISOString()}] CREATE LOAD ERROR: ${err.stack}\nPAYLOAD: ${JSON.stringify(req.body)}\n`;
-        fs.appendFileSync(logPath, logMessage);
-
         res.status(500).json({ 
             success: false, 
             message: 'Server error', 

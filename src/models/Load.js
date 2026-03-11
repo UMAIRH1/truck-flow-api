@@ -197,7 +197,7 @@ loadSchema.index({ assignedDriver: 1, status: 1 });
 loadSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate costs
-loadSchema.pre('save', function(next) {
+loadSchema.pre('save', async function() {
     // 1. Calculate Fuel Cost (if distance > 0)
     if (this.distance > 0 && this.fuelConsumption > 0) {
         this.fuelCost = (this.distance * this.fuelConsumption / 100) * (this.fuelPricePerLiter || 0);
@@ -239,8 +239,6 @@ loadSchema.pre('save', function(next) {
     this.totalCost = Math.round(this.totalCost * 100) / 100;
     this.profit = Math.round(this.profit * 100) / 100;
     this.profitPerKm = Math.round(this.profitPerKm * 100) / 100;
-
-    next();
 });
 
 // Virtual for load number (using _id)
