@@ -16,10 +16,11 @@ exports.getNotifications = async (req, res) => {
       data: notifications
     });
   } catch (error) {
-    console.error('Error fetching notifications:', error);
+    console.error('❌ Get Notifications Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching notifications'
+      message: 'Error fetching notifications',
+      error: error.message
     });
   }
 };
@@ -38,10 +39,11 @@ exports.getUnreadCount = async (req, res) => {
       count
     });
   } catch (error) {
-    console.error('Error fetching unread count:', error);
+    console.error('❌ Get Unread Count Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching unread count'
+      message: 'Error fetching unread count',
+      error: error.message
     });
   }
 };
@@ -67,10 +69,11 @@ exports.markAsRead = async (req, res) => {
       data: notification
     });
   } catch (error) {
-    console.error('Error marking notification as read:', error);
+    console.error('❌ Mark As Read Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error marking notification as read'
+      message: 'Error marking notification as read',
+      error: error.message
     });
   }
 };
@@ -89,10 +92,11 @@ exports.markAllAsRead = async (req, res) => {
       message: 'All notifications marked as read'
     });
   } catch (error) {
-    console.error('Error marking all notifications as read:', error);
+    console.error('❌ Mark All As Read Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error marking all notifications as read'
+      message: 'Error marking all notifications as read',
+      error: error.message
     });
   }
 };
@@ -118,10 +122,11 @@ exports.deleteNotification = async (req, res) => {
       message: 'Notification deleted'
     });
   } catch (error) {
-    console.error('Error deleting notification:', error);
+    console.error('❌ Delete Notification Error:', error);
     res.status(500).json({
       success: false,
-      message: 'Error deleting notification'
+      message: 'Error deleting notification',
+      error: error.message
     });
   }
 };

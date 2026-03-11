@@ -105,8 +105,12 @@ exports.getManagerDashboard = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Manager Dashboard Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -165,7 +169,11 @@ exports.getDriverDashboard = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Driver Dashboard Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };

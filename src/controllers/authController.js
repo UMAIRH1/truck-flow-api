@@ -69,8 +69,12 @@ exports.login = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Login Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -94,8 +98,12 @@ exports.getMe = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Get Me Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -142,8 +150,12 @@ exports.refreshToken = async (req, res) => {
             token: accessToken,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Refresh Token Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -200,10 +212,11 @@ exports.forgotPassword = async (req, res) => {
             message: 'OTP sent to your email',
         });
     } catch (err) {
-        console.error(err);
+        console.error('❌ Forgot Password Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to send OTP. Please try again.' 
+            message: 'Failed to send OTP. Please try again.',
+            error: err.message
         });
     }
 };
@@ -269,10 +282,11 @@ exports.resetPassword = async (req, res) => {
             message: 'Password reset successfully',
         });
     } catch (err) {
-        console.error(err);
+        console.error('❌ Reset Password Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to reset password. Please try again.' 
+            message: 'Failed to reset password. Please try again.',
+            error: err.message
         });
     }
 };
@@ -353,10 +367,11 @@ exports.setupPassword = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
+        console.error('❌ Setup Password Error:', err);
         res.status(500).json({ 
             success: false, 
-            message: 'Failed to setup password. Please try again.' 
+            message: 'Failed to setup password. Please try again.',
+            error: err.message
         });
     }
 };

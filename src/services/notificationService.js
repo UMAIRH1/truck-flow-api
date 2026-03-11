@@ -160,6 +160,27 @@ const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
 };
 
 /**
+ * Notify manager about load in transit
+ */
+const notifyManagerLoadInTransit = async (managerId, load, driverName) => {
+  const loadNum = load.loadNumber || load._id.toString().slice(-8).toUpperCase();
+  return createNotification({
+    userId: managerId,
+    type: 'load_in_transit',
+    title: 'Load In Transit',
+    message: `${driverName} has started the journey for load #${loadNum}`,
+    titleKey: 'notifications.loadInTransit',
+    messageKey: 'notifications.driverStartedLoadJourney',
+    params: {
+        driverName,
+        loadNumber: loadNum
+    },
+    loadId: load._id,
+    loadNumber: loadNum
+  });
+};
+
+/**
  * Get user notifications
  */
 const getUserNotifications = async (userId, limit = 50) => {
@@ -296,6 +317,7 @@ module.exports = {
   notifyManagerLoadAccepted,
   notifyManagerLoadRejected,
   notifyManagerLoadCompleted,
+  notifyManagerLoadInTransit,
   notifyManagerDocumentsUploaded,
   notifyDriverRouteAssigned,
   notifyManagerRouteAccepted,

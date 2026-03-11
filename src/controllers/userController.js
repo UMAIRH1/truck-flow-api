@@ -83,8 +83,12 @@ exports.createDriver = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Create Driver Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -103,8 +107,12 @@ exports.getDrivers = async (req, res) => {
             drivers,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Get Drivers Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -137,7 +145,12 @@ exports.getDriver = async (req, res) => {
                 message: 'Driver not found',
             });
         }
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Get Driver Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -180,7 +193,12 @@ exports.toggleDriverStatus = async (req, res) => {
                 message: 'Driver not found',
             });
         }
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Toggle Driver Status Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -215,7 +233,12 @@ exports.deleteDriver = async (req, res) => {
                 message: 'Driver not found',
             });
         }
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Delete Driver Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -272,7 +295,11 @@ exports.updateProfile = async (req, res) => {
             },
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Update Profile Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };

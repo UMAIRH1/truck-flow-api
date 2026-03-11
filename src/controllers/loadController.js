@@ -134,8 +134,12 @@ exports.createLoad = async (req, res) => {
             load: populatedLoad,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ Create Load Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -170,8 +174,12 @@ exports.getLoads = async (req, res) => {
             loads,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -311,8 +319,12 @@ exports.updateLoad = async (req, res) => {
             load: updatedLoad,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -400,8 +412,12 @@ exports.assignDriver = async (req, res) => {
             load: updatedLoad,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -459,8 +475,12 @@ exports.acceptLoad = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -518,8 +538,12 @@ exports.declineLoad = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -585,8 +609,12 @@ exports.startLoad = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -669,8 +697,12 @@ exports.uploadPOD = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 
@@ -766,8 +798,12 @@ exports.uploadDocuments = async (req, res) => {
             load,
         });
     } catch (err) {
-        console.error('❌ Server error:', err);
-        res.status(500).json({ success: false, message: 'Server error' });
+        console.error('❌ API Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
     }
 };
 

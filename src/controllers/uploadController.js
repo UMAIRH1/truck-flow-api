@@ -64,10 +64,11 @@ exports.uploadFile = [
                 }
             });
         } catch (err) {
-            console.error(err);
+            console.error('❌ File Upload Error:', err);
             res.status(500).json({
                 success: false,
-                message: 'File upload failed'
+                message: 'File upload failed',
+                error: err.message
             });
         }
     }
