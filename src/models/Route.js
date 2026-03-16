@@ -1,11 +1,49 @@
 const mongoose = require('mongoose');
 
+/**
+ * ROUTE MODEL
+ * 
+ * A Route represents the actual truck trip/journey.
+ * 
+ * Key Concept:
+ * - A Route defines: origin, destination, distance, tolls, assigned truck, assigned driver
+ * - Multiple Loads can be attached to a single Route
+ * - The system calculates total costs (fuel, driver, truck, tolls) and compares against
+ *   total revenue from all attached loads to determine profit per route
+ * 
+ * Example:
+ * Route: Athens → Thessaloniki
+ * - Truck: TZI-24
+ * - Driver: Nikos
+ * - Distance: 500 km
+ * - Tolls: €50
+ * 
+ * Attached Loads:
+ * - Client A: 3 pallets, €500
+ * - Client B: 5 pallets, €800
+ * - Client C: 2 pallets, €400
+ * 
+ * Total Revenue: €1,700
+ * Total Cost: Fuel (€300) + Driver (€100) + Truck (€250) + Tolls (€50) = €700
+ * Profit: €1,000
+ */
+
 const routeSchema = mongoose.Schema(
     {
         // Route identification
         routeName: {
             type: String,
             required: [true, 'Please add route name'],
+            trim: true,
+        },
+
+        // Route locations (origin → destination)
+        origin: {
+            type: String,
+            trim: true,
+        },
+        destination: {
+            type: String,
             trim: true,
         },
 
@@ -140,7 +178,7 @@ routeSchema.index({ assignedDriver: 1, status: 1 });
 routeSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate route costs
-routeSchema.pre('save', function(next) {
+routeSchema.pre('save', async function() {
     // Calculate costs based on total distance
     if (this.totalDistance > 0) {
         // Fuel cost: distance × consumption / 100 × fuel_price
@@ -170,7 +208,6 @@ routeSchema.pre('save', function(next) {
         this.profit = Math.round(this.profit * 100) / 100;
         this.profitPerKm = Math.round(this.profitPerKm * 100) / 100;
     }
-    next();
 });
 
 // Virtual for route number (using _id)

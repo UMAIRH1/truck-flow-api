@@ -9,6 +9,9 @@ const createRoute = async (req, res) => {
     try {
         const { 
             routeName,
+            origin,
+            destination,
+            totalDistance,
             assignedDriverId,
             assignedTruck,
             startDate,
@@ -34,6 +37,9 @@ const createRoute = async (req, res) => {
         // Create route
         const routeData = {
             routeName,
+            origin: origin || '',
+            destination: destination || '',
+            totalDistance: totalDistance || 0,
             assignedDriver: assignedDriverId,
             assignedTruck: assignedTruck || {},
             startDate,
@@ -198,6 +204,8 @@ const updateRoute = async (req, res) => {
 
         const {
             routeName,
+            origin,
+            destination,
             assignedTruck,
             startDate,
             endDate,
@@ -212,6 +220,8 @@ const updateRoute = async (req, res) => {
 
         // Update fields if provided
         if (routeName) route.routeName = routeName;
+        if (origin !== undefined) route.origin = origin;
+        if (destination !== undefined) route.destination = destination;
         if (assignedTruck) route.assignedTruck = assignedTruck;
         if (startDate) route.startDate = startDate;
         if (endDate) route.endDate = endDate;

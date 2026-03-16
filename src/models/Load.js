@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+/**
+ * LOAD MODEL
+ * 
+ * A Load represents a shipment/cargo that needs to be transported.
+ * 
+ * Key Concept:
+ * - Loads can exist INDEPENDENTLY before being assigned to a Route
+ * - A Load stores: client info, pickup/delivery locations, pallets/weight, price, notes
+ * - Multiple Loads can be attached to a single Route
+ * 
+ * Example:
+ * - Load 1: Client A, Athens → Thessaloniki, 3 pallets, €500
+ * - Load 2: Client B, Athens → Thessaloniki, 5 pallets, €800
+ * - Load 3: Client C, Athens → Thessaloniki, 2 pallets, €400
+ * 
+ * These 3 loads can be attached to Route "Athens-Thessaloniki-001"
+ */
+
 const loadSchema = mongoose.Schema(
     {
         // Location fields (simple strings matching UI)
@@ -92,9 +110,11 @@ const loadSchema = mongoose.Schema(
         },
 
         // Route reference (if load is part of a route)
+        // A Load can exist independently or be attached to a Route
         routeId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Route',
+            default: null,
         },
 
         // Load details
