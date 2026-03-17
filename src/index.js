@@ -73,7 +73,7 @@ app.get('/api/test', (req, res) => {
     res.status(200).json({
         success: true,
         message: 'Backend is UPDATED and running the latest code!',
-        version: '1.1.0-manual-sync-test',
+        version: '2.1.0-manual-sync-test',
         timestamp: new Date().toISOString(),
     });
 });
