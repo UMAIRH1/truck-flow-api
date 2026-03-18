@@ -218,41 +218,45 @@ loadSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate costs
 loadSchema.pre('save', async function() {
-    // 1. Calculate Fuel Cost (if distance > 0)
-    if (this.distance > 0 && this.fuelConsumption > 0) {
-        this.fuelCost = (this.distance * this.fuelConsumption / 100) * (this.fuelPricePerLiter || 0);
+    // COST CALCULATION FORMULA (as per client requirements):
+    // 1. Fuel Cost = distance × (fuel consumption / 100) × fuel price per liter
+    // 2. Driver Cost = daily driver cost
+    // 3. Truck Cost = distance × cost per km
+    // 4. Total Cost = fuel cost + driver cost + truck cost + tolls
+    // 5. Profit = client price - total cost
+    // 6. Profit per km = profit / distance
+
+    // 1. Calculate Fuel Cost
+    if (this.distance > 0 && this.fuelConsumption > 0 && this.fuelPricePerLiter > 0) {
+        // Formula: distance × (fuel consumption / 100) × fuel price per liter
+        this.fuelCost = this.distance * (this.fuelConsumption / 100) * this.fuelPricePerLiter;
     } else {
         this.fuelCost = 0;
     }
 
-    // 2. Calculate Driver Cost (Use assigned driver price or daily cost)
-    // If a specific price is set for this load (driverPrice), use that.
-    // Otherwise fall back to daily cost.
-    this.driverCost = (this.driverPrice > 0) ? this.driverPrice : (this.driverDailyCost || 0);
+    // 2. Driver Cost = daily driver cost (fixed cost per trip)
+    this.driverCost = this.driverDailyCost || 0;
 
-    // 3. Calculate Truck Cost
+    // 3. Truck Cost = distance × cost per km
     if (this.distance > 0 && this.truckCostPerKm > 0) {
         this.truckCost = this.distance * this.truckCostPerKm;
     } else {
         this.truckCost = 0;
     }
 
-    // 4. Sum everything (Total Cost)
-    // Include manual expenses (fuel, tolls, otherExpenses) and calculated costs
+    // 4. Total Cost = fuel + driver + truck + tolls
     this.totalCost = this.fuelCost + 
                     this.driverCost + 
                     this.truckCost + 
-                    (this.tolls || 0) + 
-                    (this.fuel || 0) + // Include manual fuel expense if added
-                    (this.otherExpenses || 0);
+                    (this.tolls || 0);
 
-    // 5. Calculate Profit
+    // 5. Profit = client price - total cost
     this.profit = (this.clientPrice || 0) - this.totalCost;
 
     // 6. Profit per km
     this.profitPerKm = this.distance > 0 ? this.profit / this.distance : 0;
 
-    // Rounding
+    // Round to 2 decimal places
     this.fuelCost = Math.round(this.fuelCost * 100) / 100;
     this.driverCost = Math.round(this.driverCost * 100) / 100;
     this.truckCost = Math.round(this.truckCost * 100) / 100;

@@ -11,6 +11,68 @@ const MIN_REQUEST_INTERVAL = 500; // 500ms between requests
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Calculate distance using Google Maps Distance Matrix API
+ * @param {string} origin - Origin location string
+ * @param {string} destination - Destination location string
+ * @returns {Promise<{distance: number, unit: string, duration: number}>}
+ */
+const calculateRouteDistanceWithGoogle = async (origin, destination) => {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  
+  if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+    console.log('⚠️ Google Maps API key not configured, using fallback method');
+    return calculateRouteDistanceFallback(origin, destination);
+  }
+
+  try {
+    console.log(`🚚 Calculating route with Google Maps: ${origin} → ${destination}`);
+    
+    const url = 'https://maps.googleapis.com/maps/api/distancematrix/json';
+    const response = await axios.get(url, {
+      params: {
+        origins: origin,
+        destinations: destination,
+        mode: 'driving',
+        units: 'metric',
+        key: apiKey,
+      },
+      timeout: 10000,
+    });
+
+    if (response.data.status === 'OK' && response.data.rows && response.data.rows.length > 0) {
+      const element = response.data.rows[0].elements[0];
+      
+      if (element.status === 'OK') {
+        const distanceInMeters = element.distance.value;
+        const durationInSeconds = element.duration.value;
+        const distanceInKm = Math.round((distanceInMeters / 1000) * 10) / 10;
+
+        console.log(`✅ Google Maps distance: ${distanceInKm} km (${Math.round(durationInSeconds / 60)} min)`);
+
+        return {
+          distance: distanceInKm,
+          unit: 'km',
+          duration: Math.round(durationInSeconds / 60), // duration in minutes
+          distanceText: element.distance.text,
+          durationText: element.duration.text,
+          origin: response.data.origin_addresses[0],
+          destination: response.data.destination_addresses[0],
+        };
+      }
+    }
+
+    // If Google Maps fails, use fallback
+    console.log('⚠️ Google Maps API returned no results, using fallback');
+    return calculateRouteDistanceFallback(origin, destination);
+    
+  } catch (error) {
+    console.error('❌ Google Maps API error:', error.message);
+    console.log('⚠️ Falling back to alternative method');
+    return calculateRouteDistanceFallback(origin, destination);
+  }
+};
+
+/**
  * Get cached geocode result or fetch new one
  */
 const getCachedGeocode = async (location) => {
@@ -160,14 +222,14 @@ const toRad = (degrees) => {
 };
 
 /**
- * Calculate distance between two locations using OSRM (road distance)
+ * Fallback: Calculate distance using OSRM (road distance)
  * @param {string} pickupLocation - Pickup location string
  * @param {string} dropoffLocation - Dropoff location string
  * @returns {Promise<{distance: number, unit: string, duration: number}>}
  */
-const calculateRouteDistance = async (pickupLocation, dropoffLocation) => {
+const calculateRouteDistanceFallback = async (pickupLocation, dropoffLocation) => {
   try {
-    console.log(`🚚 Calculating route: ${pickupLocation} → ${dropoffLocation}`);
+    console.log(`🚚 Calculating route (fallback): ${pickupLocation} → ${dropoffLocation}`);
     
     // Use cached geocoding for faster results
     const [pickup, dropoff] = await Promise.all([
@@ -239,6 +301,16 @@ const calculateRouteDistance = async (pickupLocation, dropoffLocation) => {
     console.error('❌ Distance calculation error:', error.message);
     throw error;
   }
+};
+
+/**
+ * Main function to calculate route distance (tries Google Maps first, then fallback)
+ * @param {string} pickupLocation - Pickup location string
+ * @param {string} dropoffLocation - Dropoff location string
+ * @returns {Promise<{distance: number, unit: string, duration: number}>}
+ */
+const calculateRouteDistance = async (pickupLocation, dropoffLocation) => {
+  return calculateRouteDistanceWithGoogle(pickupLocation, dropoffLocation);
 };
 
 module.exports = {

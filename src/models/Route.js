@@ -179,25 +179,39 @@ routeSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate route costs
 routeSchema.pre('save', async function() {
-    // Calculate costs based on total distance
-    if (this.totalDistance > 0) {
-        // Fuel cost: distance × consumption / 100 × fuel_price
-        this.fuelCost = (this.totalDistance * this.fuelConsumption / 100) * this.fuelPricePerLiter;
+    // COST CALCULATION FORMULA (as per client requirements):
+    // 1. Fuel Cost = distance × (fuel consumption / 100) × fuel price per liter
+    // 2. Driver Cost = daily driver cost
+    // 3. Truck Cost = distance × cost per km
+    // 4. Total Cost = fuel cost + driver cost + truck cost + tolls
+    // 5. Profit = total revenue - total cost
+    // 6. Profit per km = profit / distance
 
-        // Driver cost is daily cost
+    if (this.totalDistance > 0) {
+        // 1. Fuel Cost = distance × (fuel consumption / 100) × fuel price per liter
+        if (this.fuelConsumption > 0 && this.fuelPricePerLiter > 0) {
+            this.fuelCost = this.totalDistance * (this.fuelConsumption / 100) * this.fuelPricePerLiter;
+        } else {
+            this.fuelCost = 0;
+        }
+
+        // 2. Driver Cost = daily driver cost (fixed cost per trip)
         this.driverCost = this.driverDailyCost || 0;
 
-        // Truck cost: distance × cost_per_km
-        this.truckCost = this.totalDistance * this.truckCostPerKm;
+        // 3. Truck Cost = distance × cost per km
+        if (this.truckCostPerKm > 0) {
+            this.truckCost = this.totalDistance * this.truckCostPerKm;
+        } else {
+            this.truckCost = 0;
+        }
 
-        // Total cost: fuel + driver + truck + tolls + other
-        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + 
-                        (this.tolls || 0) + (this.otherExpenses || 0);
+        // 4. Total Cost = fuel + driver + truck + tolls
+        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + (this.tolls || 0);
 
-        // Profit: revenue - total_cost
+        // 5. Profit = total revenue - total cost
         this.profit = (this.totalRevenue || 0) - this.totalCost;
 
-        // Profit per km
+        // 6. Profit per km
         this.profitPerKm = this.totalDistance > 0 ? this.profit / this.totalDistance : 0;
 
         // Round to 2 decimal places
