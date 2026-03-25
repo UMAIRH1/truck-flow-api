@@ -46,6 +46,22 @@ const routeSchema = mongoose.Schema(
             type: String,
             trim: true,
         },
+        driverStartingLocation: {
+            type: String,
+            trim: true,
+        },
+        originCoords: {
+            lat: Number,
+            lng: Number
+        },
+        destinationCoords: {
+            lat: Number,
+            lng: Number
+        },
+        driverStartingCoords: {
+            lat: Number,
+            lng: Number
+        },
 
         // Assigned resources
         assignedDriver: {
@@ -80,9 +96,23 @@ const routeSchema = mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Load',
         }],
+        
+        // Load sequence (ordered array of load IDs)
+        loadSequence: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Load',
+        }],
 
         // Cost Model (calculated from all loads in route)
         totalDistance: {
+            type: Number,
+            default: 0,
+        },
+        preRouteDistance: {
+            type: Number,
+            default: 0,
+        },
+        routeDistance: {
             type: Number,
             default: 0,
         },
@@ -181,9 +211,9 @@ routeSchema.index({ createdAt: -1 });
 routeSchema.pre('save', async function() {
     // COST CALCULATION FORMULA (as per client requirements):
     // 1. Fuel Cost = distance × (fuel consumption / 100) × fuel price per liter
-    // 2. Driver Cost = daily driver cost
+    // 2. Driver Cost = daily driver cost × number of days
     // 3. Truck Cost = distance × cost per km
-    // 4. Total Cost = fuel cost + driver cost + truck cost + tolls
+    // 4. Total Cost = fuel cost + driver cost + truck cost + tolls + other expenses
     // 5. Profit = total revenue - total cost
     // 6. Profit per km = profit / distance
 
@@ -195,8 +225,16 @@ routeSchema.pre('save', async function() {
             this.fuelCost = 0;
         }
 
-        // 2. Driver Cost = daily driver cost (fixed cost per trip)
-        this.driverCost = this.driverDailyCost || 0;
+        // 2. Driver Cost = daily driver cost × duration (minimum 1 day)
+        if (this.startDate && this.endDate) {
+            const start = new Date(this.startDate);
+            const end = new Date(this.endDate);
+            const diffTime = Math.abs(end - start);
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+            this.driverCost = (this.driverDailyCost || 0) * diffDays;
+        } else {
+            this.driverCost = this.driverDailyCost || 0;
+        }
 
         // 3. Truck Cost = distance × cost per km
         if (this.truckCostPerKm > 0) {
@@ -205,8 +243,8 @@ routeSchema.pre('save', async function() {
             this.truckCost = 0;
         }
 
-        // 4. Total Cost = fuel + driver + truck + tolls
-        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + (this.tolls || 0);
+        // 4. Total Cost = fuel + driver + truck + tolls + otherExpenses
+        this.totalCost = this.fuelCost + this.driverCost + this.truckCost + (this.tolls || 0) + (this.otherExpenses || 0);
 
         // 5. Profit = total revenue - total cost
         this.profit = (this.totalRevenue || 0) - this.totalCost;

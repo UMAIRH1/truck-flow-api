@@ -31,6 +31,14 @@ const loadSchema = mongoose.Schema(
             required: [true, 'Please add dropoff location'],
             trim: true,
         },
+        pickupCoords: {
+            lat: Number,
+            lng: Number
+        },
+        dropoffCoords: {
+            lat: Number,
+            lng: Number
+        },
 
         // Distance information
         distance: {

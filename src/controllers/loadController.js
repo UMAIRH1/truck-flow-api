@@ -25,7 +25,9 @@ exports.createLoad = async (req, res) => {
             tolls,
             otherExpenses,
             notes,
-            driverId
+            driverId,
+            pickupCoords,
+            dropoffCoords
         } = req.body;
 
         // Safety check for user (should be handled by middleware)
@@ -97,6 +99,8 @@ exports.createLoad = async (req, res) => {
             shippingType: shippingType || 'FTL',
             loadWeight: loadWeight || 0,
             pallets: pallets || undefined,
+            pickupCoords,
+            dropoffCoords,
             loadingDate,
             loadingTime,
             paymentTerms: paymentTerms || 45,
@@ -824,12 +828,12 @@ exports.uploadDocuments = async (req, res) => {
     }
 };
 
-// @desc    Calculate distance between two locations
+// @desc    Calculate distance between two locations or with waypoints
 // @route   POST /api/loads/calculate-distance
 // @access  Private/Manager
 exports.calculateDistance = async (req, res) => {
     try {
-        const { pickupLocation, dropoffLocation } = req.body;
+        const { pickupLocation, dropoffLocation, waypoints } = req.body;
 
         if (!pickupLocation || !dropoffLocation) {
             return res.status(400).json({
@@ -838,14 +842,28 @@ exports.calculateDistance = async (req, res) => {
             });
         }
 
-        const distanceData = await calculateRouteDistance(pickupLocation, dropoffLocation);
+        let distanceData;
+        
+        // If waypoints provided, use waypoint calculation
+        if (waypoints && Array.isArray(waypoints) && waypoints.length > 0) {
+            const { calculateRouteDistanceWithWaypoints } = require('../services/geocodeService');
+            distanceData = await calculateRouteDistanceWithWaypoints(
+                pickupLocation, 
+                dropoffLocation, 
+                waypoints
+            );
+        } else {
+            distanceData = await calculateRouteDistance(pickupLocation, dropoffLocation);
+        }
 
         res.status(200).json({
             success: true,
             distance: distanceData.distance,
             unit: distanceData.unit,
-            pickup: distanceData.pickup,
-            dropoff: distanceData.dropoff,
+            duration: distanceData.duration,
+            origin: distanceData.origin || pickupLocation,
+            destination: distanceData.destination || dropoffLocation,
+            waypoints: distanceData.waypoints || [],
         });
     } catch (err) {
         console.error('Distance calculation error:', err);

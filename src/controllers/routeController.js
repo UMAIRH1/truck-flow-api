@@ -7,7 +7,7 @@ const notificationService = require('../services/notificationService');
 // @access  Private/Manager
 const createRoute = async (req, res) => {
     try {
-        const { 
+        const {
             routeName,
             origin,
             destination,
@@ -24,6 +24,12 @@ const createRoute = async (req, res) => {
             otherExpenses,
             notes,
             loadIds, // Array of load IDs to attach
+            originCoords,
+            destinationCoords,
+            driverStartingCoords,
+            preRouteDistance,
+            routeDistance,
+            driverStartingLocation
         } = req.body;
 
         // Validate required fields
@@ -40,6 +46,12 @@ const createRoute = async (req, res) => {
             origin: origin || '',
             destination: destination || '',
             totalDistance: totalDistance || 0,
+            preRouteDistance: preRouteDistance || 0,
+            routeDistance: routeDistance || 0,
+            originCoords,
+            destinationCoords,
+            driverStartingCoords,
+            driverStartingLocation,
             assignedDriver: assignedDriverId,
             assignedTruck: assignedTruck || {},
             startDate,
@@ -62,20 +74,27 @@ const createRoute = async (req, res) => {
         if (loadIds && loadIds.length > 0) {
             await Load.updateMany(
                 { _id: { $in: loadIds } },
-                { 
-                    $set: { 
+                {
+                    $set: {
                         routeId: route._id,
-                        assignedDriver: assignedDriverId 
-                    } 
+                        assignedDriver: assignedDriverId
+                    }
                 }
             );
             route.loads = loadIds;
-            
-            // Calculate total distance and revenue from loads
+
+            // Calculate total distance and revenue from loads ONLY if not provided
             const loads = await Load.find({ _id: { $in: loadIds } });
-            route.totalDistance = loads.reduce((sum, load) => sum + (load.distance || 0), 0);
+
+            if (!totalDistance) {
+                route.totalDistance = loads.reduce((sum, load) => sum + (load.distance || 0), 0);
+            }
+            if (!routeDistance) {
+                route.routeDistance = route.totalDistance;
+            }
+
             route.totalRevenue = loads.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
-            
+
             await route.save();
         }
 
@@ -99,10 +118,10 @@ const createRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ Create Route Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -140,10 +159,10 @@ const getRoutes = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -166,7 +185,7 @@ const getRoute = async (req, res) => {
         }
 
         // Driver can only view their assigned routes
-        if (req.user.role === 'driver' && 
+        if (req.user.role === 'driver' &&
             route.assignedDriver._id.toString() !== req.user._id.toString()) {
             return res.status(403).json({
                 success: false,
@@ -180,10 +199,10 @@ const getRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -247,10 +266,10 @@ const updateRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -283,10 +302,10 @@ const deleteRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -317,11 +336,11 @@ const addLoadsToRoute = async (req, res) => {
         // Update loads with routeId and driver
         await Load.updateMany(
             { _id: { $in: loadIds } },
-            { 
-                $set: { 
+            {
+                $set: {
                     routeId: route._id,
-                    assignedDriver: route.assignedDriver 
-                } 
+                    assignedDriver: route.assignedDriver
+                }
             }
         );
 
@@ -347,10 +366,10 @@ const addLoadsToRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -398,10 +417,10 @@ const removeLoadFromRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -460,10 +479,10 @@ const acceptRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };
@@ -521,10 +540,10 @@ const rejectRoute = async (req, res) => {
         });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({ 
-            success: false, 
-            message: 'Server error: ' + err.message, 
-            error: err.message 
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
         });
     }
 };

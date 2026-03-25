@@ -11,6 +11,22 @@ const MIN_REQUEST_INTERVAL = 500; // 500ms between requests
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
+ * Check if a string is a coordinate pair (lat,lng)
+ */
+const isCoordinateString = (str) => {
+  if (typeof str !== 'string') return false;
+  // If it's a long address, it's not a simple coordinate pair
+  if (str.length > 50) return false; 
+  const parts = str.split(',');
+  if (parts.length !== 2) return false;
+  const lat = parseFloat(parts[0]);
+  const lng = parseFloat(parts[1]);
+  // Basic range check for lat/lng
+  return !isNaN(lat) && !isNaN(lng) && 
+         Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
+};
+
+/**
  * Calculate distance using Google Maps Distance Matrix API
  * @param {string} origin - Origin location string
  * @param {string} destination - Destination location string
@@ -99,6 +115,12 @@ const getCachedGeocode = async (location) => {
  * @returns {Promise<{lat: number, lon: number}>}
  */
 const geocodeLocation = async (location) => {
+  // If location is already coordinates, return them directly
+  if (isCoordinateString(location)) {
+    const [lat, lon] = location.split(',').map(s => parseFloat(s.trim()));
+    return { lat, lon };
+  }
+
   // Rate limiting
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
@@ -304,6 +326,162 @@ const calculateRouteDistanceFallback = async (pickupLocation, dropoffLocation) =
 };
 
 /**
+ * Calculate route distance with multiple waypoints using Google Maps Directions API
+ * @param {string} origin - Starting location
+ * @param {string} destination - Ending location
+ * @param {Array<string>} waypoints - Array of waypoint locations
+ * @returns {Promise<{distance: number, unit: string, duration: number}>}
+ */
+const calculateRouteDistanceWithWaypoints = async (origin, destination, waypoints = []) => {
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+  
+  if (!apiKey || apiKey === 'your-google-maps-api-key-here') {
+    console.log('⚠️ Google Maps API key not configured, using fallback method');
+    return calculateRouteDistanceWithWaypointsFallback(origin, destination, waypoints);
+  }
+
+  try {
+    console.log(`🚚 Calculating route with waypoints: ${origin} → [${waypoints.length} stops] → ${destination}`);
+    
+    const url = 'https://maps.googleapis.com/maps/api/directions/json';
+    const params = {
+      origin: origin,
+      destination: destination,
+      mode: 'driving',
+      units: 'metric',
+      key: apiKey,
+    };
+
+    // Add waypoints if provided
+    if (waypoints && waypoints.length > 0) {
+      params.waypoints = waypoints.join('|');
+    }
+
+    const response = await axios.get(url, {
+      params,
+      timeout: 15000,
+    });
+
+    if (response.data.status === 'OK' && response.data.routes && response.data.routes.length > 0) {
+      const route = response.data.routes[0];
+      const leg = route.legs[0];
+      
+      // Calculate total distance and duration across all legs
+      let totalDistanceMeters = 0;
+      let totalDurationSeconds = 0;
+      
+      route.legs.forEach(leg => {
+        totalDistanceMeters += leg.distance.value;
+        totalDurationSeconds += leg.duration.value;
+      });
+
+      const distanceInKm = Math.round((totalDistanceMeters / 1000) * 10) / 10;
+
+      console.log(`✅ Google Maps distance with waypoints: ${distanceInKm} km (${Math.round(totalDurationSeconds / 60)} min)`);
+
+      return {
+        distance: distanceInKm,
+        unit: 'km',
+        duration: Math.round(totalDurationSeconds / 60),
+        origin: route.legs[0].start_address,
+        destination: route.legs[route.legs.length - 1].end_address,
+        waypoints: route.legs.slice(0, -1).map(leg => leg.end_address),
+      };
+    }
+
+    // If Google Maps fails, use fallback
+    console.log('⚠️ Google Maps Directions API returned no results, using fallback');
+    return calculateRouteDistanceWithWaypointsFallback(origin, destination, waypoints);
+    
+  } catch (error) {
+    console.error('❌ Google Maps Directions API error:', error.message);
+    console.log('⚠️ Falling back to alternative method');
+    return calculateRouteDistanceWithWaypointsFallback(origin, destination, waypoints);
+  }
+};
+
+/**
+ * Fallback: Calculate route distance with waypoints using OSRM
+ * @param {string} origin - Starting location
+ * @param {string} destination - Ending location
+ * @param {Array<string>} waypoints - Array of waypoint locations
+ * @returns {Promise<{distance: number, unit: string, duration: number}>}
+ */
+const calculateRouteDistanceWithWaypointsFallback = async (origin, destination, waypoints = []) => {
+  try {
+    console.log(`🚚 Calculating route with waypoints (fallback): ${origin} → [${waypoints.length} stops] → ${destination}`);
+    
+    // Geocode all locations
+    const locations = [origin, ...waypoints, destination];
+    const coords = await Promise.all(locations.map(loc => getCachedGeocode(loc)));
+
+    console.log(`📍 Geocoded ${coords.length} locations`);
+
+    // Build OSRM URL with all coordinates
+    const coordString = coords.map(c => `${c.lon},${c.lat}`).join(';');
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${coordString}?overview=false`;
+    
+    let response;
+    let retries = 2;
+    
+    while (retries > 0) {
+      try {
+        response = await axios.get(osrmUrl, { 
+          timeout: 15000,
+          headers: { 'User-Agent': 'TruckFlow/1.0' }
+        });
+        break;
+      } catch (err) {
+        retries--;
+        if (retries === 0) throw err;
+        console.log(`⚠️ OSRM request failed, retrying... (${retries} attempts left)`);
+        await delay(1000);
+      }
+    }
+
+    if (response.data && response.data.routes && response.data.routes.length > 0) {
+      const route = response.data.routes[0];
+      const distanceInMeters = route.distance;
+      const durationInSeconds = route.duration;
+      const distanceInKm = Math.round((distanceInMeters / 1000) * 10) / 10;
+
+      console.log(`✅ Route distance with waypoints: ${distanceInKm} km (${Math.round(durationInSeconds / 60)} min)`);
+
+      return {
+        distance: distanceInKm,
+        unit: 'km',
+        duration: Math.round(durationInSeconds / 60),
+        fallback: true,
+      };
+    }
+
+    // Last resort: sum of straight-line distances
+    console.log('⚠️ OSRM routing failed, using straight-line distance approximation');
+    let totalDistance = 0;
+    for (let i = 0; i < coords.length - 1; i++) {
+      totalDistance += calculateDistance(
+        coords[i].lat,
+        coords[i].lon,
+        coords[i + 1].lat,
+        coords[i + 1].lon
+      );
+    }
+
+    const approximateRoadDistance = Math.round(totalDistance * 1.3 * 10) / 10;
+
+    return {
+      distance: approximateRoadDistance,
+      unit: 'km',
+      duration: null,
+      fallback: true,
+    };
+  } catch (error) {
+    console.error('❌ Distance calculation with waypoints error:', error.message);
+    throw error;
+  }
+};
+
+/**
  * Main function to calculate route distance (tries Google Maps first, then fallback)
  * @param {string} pickupLocation - Pickup location string
  * @param {string} dropoffLocation - Dropoff location string
@@ -317,4 +495,5 @@ module.exports = {
   geocodeLocation,
   calculateDistance,
   calculateRouteDistance,
+  calculateRouteDistanceWithWaypoints,
 };
