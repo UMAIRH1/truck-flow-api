@@ -9,6 +9,10 @@ const {
     removeLoadFromRoute,
     acceptRoute,
     rejectRoute,
+    startRoute,
+    completeRoute,
+    startRouteLoad,
+    completeRouteLoad,
 } = require('../controllers/routeController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -27,6 +31,10 @@ router.delete('/:id/loads/:loadId', authorize('manager'), removeLoadFromRoute);
 // Driver only routes
 router.patch('/:id/accept', authorize('driver'), acceptRoute);
 router.patch('/:id/reject', authorize('driver'), rejectRoute);
+router.patch('/:id/start', authorize('driver'), startRoute);
+router.patch('/:id/complete', authorize('driver'), completeRoute);
+router.patch('/:id/loads/:loadId/start', authorize('driver'), startRouteLoad);
+router.patch('/:id/loads/:loadId/complete', authorize('driver'), completeRouteLoad);
 
 // Both manager and driver
 router.get('/', getRoutes);

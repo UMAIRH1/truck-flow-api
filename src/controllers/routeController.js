@@ -548,6 +548,172 @@ const rejectRoute = async (req, res) => {
     }
 };
 
+// @desc    Start route (driver only) - accepted -> in-progress
+// @route   PATCH /api/routes/:id/start
+// @access  Private/Driver
+const startRoute = async (req, res) => {
+    try {
+        const route = await Route.findById(req.params.id);
+        if (!route) {
+            return res.status(404).json({ success: false, message: 'Route not found' });
+        }
+
+        if (route.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
+        }
+
+        if (route.status !== 'accepted') {
+            return res.status(400).json({ success: false, message: `Cannot start a route with status '${route.status}'` });
+        }
+
+        route.status = 'in-progress';
+        await route.save();
+
+        await route.populate('createdBy', 'name email');
+        await route.populate('assignedDriver', 'name email phone');
+        await route.populate('loads');
+
+        res.status(200).json({ success: true, message: 'Route started', route });
+    } catch (err) {
+        console.error('❌ API Error:', err);
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+    }
+};
+
+// @desc    Complete route (driver only) - in-progress -> completed
+// @route   PATCH /api/routes/:id/complete
+// @access  Private/Driver
+const completeRoute = async (req, res) => {
+    try {
+        const route = await Route.findById(req.params.id).populate('loads');
+        if (!route) {
+            return res.status(404).json({ success: false, message: 'Route not found' });
+        }
+
+        if (route.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
+        }
+
+        if (route.status !== 'in-progress') {
+            return res.status(400).json({ success: false, message: `Cannot complete a route with status '${route.status}'` });
+        }
+
+        // Check if all loads are completed
+        const incompleteLoads = route.loads.filter(l => l.status !== 'completed');
+        if (incompleteLoads.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: `Cannot complete route: ${incompleteLoads.length} load(s) are not yet completed`,
+            });
+        }
+
+        route.status = 'completed';
+        route.completedAt = new Date();
+        await route.save();
+
+        await route.populate('createdBy', 'name email');
+        await route.populate('assignedDriver', 'name email phone');
+
+        res.status(200).json({ success: true, message: 'Route completed', route });
+    } catch (err) {
+        console.error('❌ API Error:', err);
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+    }
+};
+
+// @desc    Start a specific load within a route (driver only)
+// @route   PATCH /api/routes/:id/loads/:loadId/start
+// @access  Private/Driver
+const startRouteLoad = async (req, res) => {
+    try {
+        const route = await Route.findById(req.params.id);
+        if (!route) {
+            return res.status(404).json({ success: false, message: 'Route not found' });
+        }
+
+        if (route.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
+        }
+
+        if (route.status !== 'in-progress') {
+            return res.status(400).json({ success: false, message: 'Route must be in-progress to start loads' });
+        }
+
+        const load = await Load.findById(req.params.loadId);
+        if (!load) {
+            return res.status(404).json({ success: false, message: 'Load not found' });
+        }
+
+        if (!route.loads.includes(load._id.toString()) && !route.loads.some(l => l.toString() === load._id.toString())) {
+            return res.status(400).json({ success: false, message: 'This load is not part of this route' });
+        }
+
+        if (load.status !== 'pending' && load.status !== 'accepted') {
+            return res.status(400).json({ success: false, message: `Cannot start a load with status '${load.status}'` });
+        }
+
+        load.status = 'in-progress';
+        await load.save();
+
+        // Re-populate the route
+        await route.populate('loads');
+
+        res.status(200).json({ success: true, message: 'Load started', load, route });
+    } catch (err) {
+        console.error('❌ API Error:', err);
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+    }
+};
+
+// @desc    Complete a specific load within a route (driver only)
+// @route   PATCH /api/routes/:id/loads/:loadId/complete
+// @access  Private/Driver
+const completeRouteLoad = async (req, res) => {
+    try {
+        const route = await Route.findById(req.params.id);
+        if (!route) {
+            return res.status(404).json({ success: false, message: 'Route not found' });
+        }
+
+        if (route.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
+        }
+
+        if (route.status !== 'in-progress') {
+            return res.status(400).json({ success: false, message: 'Route must be in-progress to complete loads' });
+        }
+
+        const load = await Load.findById(req.params.loadId);
+        if (!load) {
+            return res.status(404).json({ success: false, message: 'Load not found' });
+        }
+
+        if (load.status !== 'in-progress') {
+            return res.status(400).json({ success: false, message: `Cannot complete a load with status '${load.status}'` });
+        }
+
+        load.status = 'completed';
+        await load.save();
+
+        // Re-populate the route
+        await route.populate('loads');
+
+        // Check if all loads are now completed
+        const allCompleted = route.loads.every(l => l.status === 'completed');
+
+        res.status(200).json({
+            success: true,
+            message: allCompleted ? 'Load completed. All loads are done! You can now complete the route.' : 'Load completed',
+            load,
+            route,
+            allLoadsCompleted: allCompleted,
+        });
+    } catch (err) {
+        console.error('❌ API Error:', err);
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message });
+    }
+};
+
 module.exports = {
     createRoute,
     getRoutes,
@@ -558,4 +724,8 @@ module.exports = {
     removeLoadFromRoute,
     acceptRoute,
     rejectRoute,
+    startRoute,
+    completeRoute,
+    startRouteLoad,
+    completeRouteLoad,
 };
