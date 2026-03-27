@@ -326,6 +326,15 @@ exports.updateLoad = async (req, res) => {
 
         await load.save();
 
+        // If load is attached to a route, trigger route recalculation
+        if (load.routeId) {
+            const Route = require('../models/Route');
+            const route = await Route.findById(load.routeId);
+            if (route) {
+                await route.save();
+            }
+        }
+
         const updatedLoad = await Load.findById(load._id)
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone');

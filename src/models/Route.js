@@ -209,6 +209,15 @@ routeSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate route costs
 routeSchema.pre('save', async function() {
+    // 0. Automatically aggregate revenue from all attached loads
+    if (this.loads && this.loads.length > 0) {
+        const Load = mongoose.model('Load');
+        const populatedLoads = await Load.find({ _id: { $in: this.loads } });
+        this.totalRevenue = populatedLoads.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
+    } else {
+        this.totalRevenue = 0;
+    }
+
     // COST CALCULATION FORMULA (as per client requirements):
     // 1. Fuel Cost = distance × (fuel consumption / 100) × fuel price per liter
     // 2. Driver Cost = daily driver cost × number of days
