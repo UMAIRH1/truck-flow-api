@@ -148,7 +148,218 @@ const sendDriverInvitation = async (email, name, token) => {
   }
 };
 
+/**
+ * Send email notification for load-related events
+ */
+const sendLoadNotificationEmail = async (user, load, context) => {
+  try {
+    const transporter = await createTransporter();
+    const loadNum = load.loadNumber || load._id.toString().slice(-8).toUpperCase();
+    
+    // Determine subject and title based on context
+    let subject = '';
+    let title = '';
+    let intro = '';
+    
+    switch(context) {
+      case 'assigned':
+        subject = `New Load Assigned: #${loadNum}`;
+        title = 'New Load Assigned';
+        intro = `You have been assigned a new load: <strong>#${loadNum}</strong>.`;
+        break;
+      case 'accepted':
+        subject = `Load Accepted: #${loadNum}`;
+        title = 'Load Accepted';
+        intro = `Driver <strong>${user.name}</strong> has accepted load <strong>#${loadNum}</strong>.`;
+        break;
+      case 'rejected':
+        subject = `Load Rejected: #${loadNum}`;
+        title = 'Load Rejected';
+        intro = `Driver <strong>${user.name}</strong> has rejected load <strong>#${loadNum}</strong>.`;
+        break;
+      case 'completed':
+        subject = `Load Completed: #${loadNum}`;
+        title = 'Load Completed';
+        intro = `Driver <strong>${user.name}</strong> has successfully completed load <strong>#${loadNum}</strong>.`;
+        break;
+      case 'documents_uploaded':
+        subject = `Documents Uploaded: #${loadNum}`;
+        title = 'Documents Uploaded';
+        intro = `Driver <strong>${user.name}</strong> has uploaded new documents for load <strong>#${loadNum}</strong>.`;
+        break;
+      default:
+        subject = `Load Update: #${loadNum}`;
+        title = 'Load Update';
+        intro = `There is an update for load <strong>#${loadNum}</strong>.`;
+    }
+
+    const mailOptions = {
+      from: `"TruckFlow" <${process.env.SMTP_USER}>`,
+      to: user.email,
+      subject: `${subject} - TruckFlow`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #facc15; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+            .details-box { background: #fff; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+            .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            .detail-label { font-weight: bold; color: #666; }
+            .detail-value { text-align: right; }
+            .button { display: inline-block; background: #000; color: #fff; padding: 12px 25px; text-decoration: none; border-radius: 8px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; color: #000;">TruckFlow</h1>
+            </div>
+            <div class="content">
+              <h2>${title}</h2>
+              <p>Hi ${user.name},</p>
+              <p>${intro}</p>
+              
+              <div class="details-box">
+                <div class="detail-row">
+                  <span class="detail-label">Load Number:</span>
+                  <span class="detail-value">#${loadNum}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Pickup:</span>
+                  <span class="detail-value">${load.pickupLocation}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Dropoff:</span>
+                  <span class="detail-value">${load.dropoffLocation}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Date:</span>
+                  <span class="detail-value">${new Date(load.loadingDate).toLocaleDateString()}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Time:</span>
+                  <span class="detail-value">${load.loadingTime}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Weight:</span>
+                  <span class="detail-value">${load.loadWeight} kg</span>
+                </div>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="${process.env.FRONTEND_URL}/load/${load._id}" class="button">View Load Details</a>
+              </div>
+              
+              <p>Best regards,<br>TruckFlow Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2026 TruckFlow. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Load email (${context}) sent to:`, user.email);
+    return true;
+  } catch (error) {
+    console.error(`Error sending load email (${context}):`, error);
+    return false;
+  }
+};
+
+/**
+ * Send email notification for route-related events
+ */
+const sendRouteNotificationEmail = async (driver, route) => {
+  try {
+    const transporter = await createTransporter();
+    const routeNum = route.routeNumber || `R-${route._id.toString().slice(-8).toUpperCase()}`;
+
+    const mailOptions = {
+      from: `"TruckFlow" <${process.env.SMTP_USER}>`,
+      to: driver.email,
+      subject: `New Route Assigned: ${route.routeName} - TruckFlow`,
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #facc15; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+            .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+            .details-box { background: #fff; border: 1px solid #ddd; padding: 20px; margin: 20px 0; border-radius: 8px; }
+            .detail-row { display: flex; justify-content: space-between; margin-bottom: 10px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+            .detail-label { font-weight: bold; color: #666; }
+            .detail-value { text-align: right; }
+            .button { display: inline-block; background: #000; color: #fff; padding: 12px 25px; text-decoration: none; border-radius: 8px; margin: 20px 0; }
+            .footer { text-align: center; margin-top: 20px; color: #666; font-size: 12px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1 style="margin: 0; color: #000;">TruckFlow</h1>
+            </div>
+            <div class="content">
+              <h2>New Route Assigned</h2>
+              <p>Hi ${driver.name},</p>
+              <p>You have been assigned to a new route: <strong>${route.routeName}</strong>.</p>
+              
+              <div class="details-box">
+                <div class="detail-row">
+                  <span class="detail-label">Route:</span>
+                  <span class="detail-value">${route.routeName}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">ID:</span>
+                  <span class="detail-value">${routeNum}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Start Date:</span>
+                  <span class="detail-value">${new Date(route.startDate).toLocaleDateString()}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">Loads:</span>
+                  <span class="detail-value">${route.loads ? route.loads.length : 0}</span>
+                </div>
+              </div>
+              
+              <div style="text-align: center;">
+                <a href="${process.env.FRONTEND_URL}/routes" class="button">View My Routes</a>
+              </div>
+              
+              <p>Best regards,<br>TruckFlow Team</p>
+            </div>
+            <div class="footer">
+              <p>© 2026 TruckFlow. All rights reserved.</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('Route assignment email sent to:', driver.email);
+    return true;
+  } catch (error) {
+    console.error('Error sending route assignment email:', error);
+    return false;
+  }
+};
+
 module.exports = {
   sendPasswordResetOTP,
   sendDriverInvitation,
+  sendLoadNotificationEmail,
+  sendRouteNotificationEmail,
 };

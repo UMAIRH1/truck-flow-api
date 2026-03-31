@@ -1,4 +1,6 @@
 const Notification = require('../models/Notification');
+const User = require('../models/User');
+const emailService = require('./emailService');
 const { getIO, isUserOnline } = require('../config/socket');
 
 /**
@@ -73,7 +75,9 @@ const notifyManagerNewLoad = async (managerId, load) => {
  */
 const notifyDriverLoadAssigned = async (driverId, load) => {
   const loadNum = load._id.toString().slice(-8).toUpperCase();
-  return createNotification({
+  
+  // Create in-app notification
+  const notification = await createNotification({
     userId: driverId,
     type: 'load_assigned',
     title: 'New Load Assigned',
@@ -88,6 +92,18 @@ const notifyDriverLoadAssigned = async (driverId, load) => {
     loadId: load._id,
     loadNumber: loadNum
   });
+
+  // Send email notification
+  try {
+    const driver = await User.findById(driverId);
+    if (driver && driver.email) {
+      await emailService.sendLoadNotificationEmail(driver, load, 'assigned');
+    }
+  } catch (error) {
+    console.error('Failed to send assignment email:', error);
+  }
+
+  return notification;
 };
 
 /**
@@ -95,7 +111,8 @@ const notifyDriverLoadAssigned = async (driverId, load) => {
  */
 const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
   const loadNum = load._id.toString().slice(-8).toUpperCase();
-  return createNotification({
+  
+  const notification = await createNotification({
     userId: managerId,
     type: 'load_accepted',
     title: 'Load Accepted',
@@ -111,6 +128,23 @@ const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
     loadId: load._id,
     loadNumber: loadNum
   });
+
+  // Send email to manager
+  try {
+    const manager = await User.findById(managerId);
+    if (manager && manager.email) {
+      await emailService.sendLoadNotificationEmail(
+        { email: manager.email, name: manager.name }, 
+        load, 
+        'accepted',
+        driverName
+      );
+    }
+  } catch (error) {
+    console.error('Failed to send acceptance email to manager:', error);
+  }
+
+  return notification;
 };
 
 /**
@@ -118,7 +152,8 @@ const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
  */
 const notifyManagerLoadRejected = async (managerId, load, driverName) => {
   const loadNum = load._id.toString().slice(-8).toUpperCase();
-  return createNotification({
+  
+  const notification = await createNotification({
     userId: managerId,
     type: 'load_rejected',
     title: 'Load Rejected',
@@ -134,6 +169,23 @@ const notifyManagerLoadRejected = async (managerId, load, driverName) => {
     loadId: load._id,
     loadNumber: loadNum
   });
+
+  // Send email to manager
+  try {
+    const manager = await User.findById(managerId);
+    if (manager && manager.email) {
+      await emailService.sendLoadNotificationEmail(
+        { email: manager.email, name: manager.name }, 
+        load, 
+        'rejected',
+        driverName
+      );
+    }
+  } catch (error) {
+    console.error('Failed to send rejection email to manager:', error);
+  }
+
+  return notification;
 };
 
 /**
@@ -141,7 +193,8 @@ const notifyManagerLoadRejected = async (managerId, load, driverName) => {
  */
 const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
   const loadNum = load._id.toString().slice(-8).toUpperCase();
-  return createNotification({
+  
+  const notification = await createNotification({
     userId: managerId,
     type: 'load_completed',
     title: 'Load Completed',
@@ -157,6 +210,23 @@ const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
     loadId: load._id,
     loadNumber: loadNum
   });
+
+  // Send email to manager
+  try {
+    const manager = await User.findById(managerId);
+    if (manager && manager.email) {
+      await emailService.sendLoadNotificationEmail(
+        { email: manager.email, name: manager.name }, 
+        load, 
+        'completed',
+        driverName
+      );
+    }
+  } catch (error) {
+    console.error('Failed to send completion email to manager:', error);
+  }
+
+  return notification;
 };
 
 /**
@@ -223,7 +293,8 @@ const getUnreadCount = async (userId) => {
  */
 const notifyManagerDocumentsUploaded = async (managerId, load, driverName) => {
   const loadNum = load.loadNumber || load._id.toString().slice(-8).toUpperCase();
-  return createNotification({
+  
+  const notification = await createNotification({
     userId: managerId,
     type: 'documents_uploaded',
     title: 'Documents Uploaded',
@@ -239,6 +310,23 @@ const notifyManagerDocumentsUploaded = async (managerId, load, driverName) => {
     loadId: load._id,
     loadNumber: loadNum
   });
+
+  // Send email to manager
+  try {
+    const manager = await User.findById(managerId);
+    if (manager && manager.email) {
+      await emailService.sendLoadNotificationEmail(
+        { email: manager.email, name: manager.name }, 
+        load, 
+        'documents_uploaded',
+        driverName
+      );
+    }
+  } catch (error) {
+    console.error('Failed to send documents uploaded email to manager:', error);
+  }
+
+  return notification;
 };
 
 /**
@@ -252,7 +340,7 @@ const deleteNotification = async (notificationId, userId) => {
  * Notify driver about route assignment
  */
 const notifyDriverRouteAssigned = async (driverId, route) => {
-  return createNotification({
+  const notification = await createNotification({
     userId: driverId,
     type: 'route_assigned',
     title: 'New Route Assigned',
@@ -266,6 +354,18 @@ const notifyDriverRouteAssigned = async (driverId, route) => {
     routeId: route._id,
     loadNumber: route.routeNumber
   });
+
+  // Send email notification
+  try {
+    const driver = await User.findById(driverId);
+    if (driver && driver.email) {
+      await emailService.sendRouteNotificationEmail(driver, route);
+    }
+  } catch (error) {
+    console.error('Failed to send route assignment email:', error);
+  }
+
+  return notification;
 };
 
 /**
