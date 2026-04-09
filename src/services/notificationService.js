@@ -39,7 +39,7 @@ const sendPushToUser = async (userId, payload) => {
       tokens: user.fcmTokens,
     };
 
-    const response = await admin.messaging().sendMulticast(message);
+    const response = await admin.messaging().sendEachForMulticast(message);
     
     // Clean up failed/invalid tokens
     if (response.failureCount > 0) {
