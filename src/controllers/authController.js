@@ -375,3 +375,44 @@ exports.setupPassword = async (req, res) => {
         });
     }
 };
+
+// @desc    Update FCM token
+// @route   POST /api/auth/fcm-token
+// @access  Private
+exports.updateFcmToken = async (req, res) => {
+    try {
+        const { token, action } = req.body; // action: 'add' or 'remove'
+
+        if (!token) {
+            return res.status(400).json({
+                success: false,
+                message: 'Token is required',
+            });
+        }
+
+        const user = await User.findById(req.user.id);
+
+        if (action === 'remove') {
+            user.fcmTokens = user.fcmTokens.filter(t => t !== token);
+        } else {
+            // Add if not already present
+            if (!user.fcmTokens.includes(token)) {
+                user.fcmTokens.push(token);
+            }
+        }
+
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: `FCM token ${action === 'remove' ? 'removed' : 'added'} successfully`,
+        });
+    } catch (err) {
+        console.error('❌ Update FCM Token Error:', err);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Server error', 
+            error: err.message 
+        });
+    }
+};

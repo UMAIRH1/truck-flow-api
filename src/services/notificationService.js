@@ -1,7 +1,72 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const emailService = require('./emailService');
+const admin = require('firebase-admin');
 const { getIO, isUserOnline } = require('../config/socket');
+
+// Initialize Firebase Admin
+try {
+  const serviceAccount = require('../config/firebase-service-account.json');
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log('✅ Firebase Admin initialized successfully');
+} catch (error) {
+  console.warn('⚠️ Firebase Admin could not be initialized. Push notifications will be skipped until config is provided.');
+}
+
+/**
+ * Send push notification to user's registered devices
+ */
+const sendPushToUser = async (userId, payload) => {
+  try {
+    if (!admin.apps.length) return;
+
+    const user = await User.findById(userId);
+    if (!user || !user.fcmTokens || user.fcmTokens.length === 0) return;
+
+    const message = {
+      notification: {
+        title: payload.title,
+        body: payload.message,
+      },
+      data: {
+        type: payload.type || 'general',
+        loadId: payload.loadId ? payload.loadId.toString() : '',
+        routeId: payload.routeId ? payload.routeId.toString() : '',
+        loadNumber: payload.loadNumber || '',
+      },
+      tokens: user.fcmTokens,
+    };
+
+    const response = await admin.messaging().sendMulticast(message);
+    
+    // Clean up failed/invalid tokens
+    if (response.failureCount > 0) {
+      const tokensToRemove = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          const errorCode = resp.error.code;
+          if (errorCode === 'messaging/invalid-registration-token' || 
+              errorCode === 'messaging/registration-token-not-registered') {
+            tokensToRemove.push(user.fcmTokens[idx]);
+          }
+        }
+      });
+
+      if (tokensToRemove.length > 0) {
+        await User.findByIdAndUpdate(userId, {
+          $pull: { fcmTokens: { $in: tokensToRemove } }
+        });
+        console.log(`Cleaned up ${tokensToRemove.length} invalid FCM tokens for user ${userId}`);
+      }
+    }
+
+    return response;
+  } catch (error) {
+    console.error('Error sending push notification:', error);
+  }
+};
 
 /**
  * Create and send notification
@@ -22,7 +87,7 @@ const createNotification = async ({ userId, type, title, message, titleKey, mess
       loadNumber
     });
     
-    // Send real-time notification if user is online
+    // Send real-time Socket.io notification if user is online
     if (isUserOnline(userId)) {
       const io = getIO();
       io.to(`user:${userId}`).emit('notification', {
@@ -40,6 +105,16 @@ const createNotification = async ({ userId, type, title, message, titleKey, mess
         createdAt: notification.createdAt
       });
     }
+
+    // Send Push Notification
+    await sendPushToUser(userId, {
+      title,
+      message,
+      type,
+      loadId,
+      routeId,
+      loadNumber
+    });
 
     return notification;
   } catch (error) {
