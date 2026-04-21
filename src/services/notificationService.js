@@ -3,6 +3,7 @@ const User = require('../models/User');
 const emailService = require('./emailService');
 const admin = require('firebase-admin');
 const { getIO, isUserOnline } = require('../config/socket');
+const { t } = require('../utils/i18n');
 
 // Initialize Firebase Admin
 try {
@@ -73,12 +74,20 @@ const sendPushToUser = async (userId, payload) => {
  */
 const createNotification = async ({ userId, type, title, message, titleKey, messageKey, params = {}, loadId, routeId, loadNumber }) => {
   try {
+    // Get user's preferred language
+    const user = await User.findById(userId).select('preferredLanguage');
+    const lang = user ? user.preferredLanguage : 'en';
+
+    // Localize title and message if keys are provided
+    const localizedTitle = titleKey ? t(titleKey, lang, params) : title;
+    const localizedMessage = messageKey ? t(messageKey, lang, params) : message;
+
     // Save to database
     const notification = await Notification.create({
       userId,
       type,
-      title,
-      message,
+      title: localizedTitle,
+      message: localizedMessage,
       titleKey,
       messageKey,
       params,
@@ -108,8 +117,8 @@ const createNotification = async ({ userId, type, title, message, titleKey, mess
 
     // Send Push Notification
     await sendPushToUser(userId, {
-      title,
-      message,
+      title: localizedTitle,
+      message: localizedMessage,
       type,
       loadId,
       routeId,
@@ -465,24 +474,38 @@ const notifyManagerRouteAccepted = async (managerId, route, driverName) => {
 };
 
 /**
- * Notify manager about route rejection
+ * Notify manager when driver uploads route documents
  */
-const notifyManagerRouteRejected = async (managerId, route, driverName) => {
-  return createNotification({
+const notifyManagerRouteDocumentsUploaded = async (managerId, route, driverName) => {
+  const routeNum = route.routeNumber || `R-${route._id.toString().slice(-8).toUpperCase()}`;
+  
+  const notification = await createNotification({
     userId: managerId,
-    type: 'route_rejected',
-    title: 'Route Rejected',
-    message: `${driverName} rejected route: ${route.routeName}`,
-    titleKey: 'notifications.routeRejected',
-    messageKey: 'notifications.driverRejectedRoute',
+    type: 'route_documents_uploaded',
+    title: 'Route Documents Uploaded',
+    message: `${driverName} has uploaded documents for route: ${route.routeName} (#${routeNum})`,
+    titleKey: 'notifications.routeDocumentsUploaded',
+    messageKey: 'notifications.driverUploadedRouteDocumentsDetails',
     params: {
       driverName,
       routeName: route.routeName,
-      routeNumber: route.routeNumber
+      routeNumber: routeNum
     },
     routeId: route._id,
-    loadNumber: route.routeNumber
+    loadNumber: routeNum
   });
+
+  // Send email to manager
+  try {
+    const manager = await User.findById(managerId);
+    if (manager && manager.email) {
+      await emailService.sendRouteNotificationEmail(manager, route, 'documents_uploaded', driverName);
+    }
+  } catch (error) {
+    console.error('Failed to send route documents uploaded email to manager:', error);
+  }
+
+  return notification;
 };
 
 module.exports = {
@@ -497,6 +520,7 @@ module.exports = {
   notifyDriverRouteAssigned,
   notifyManagerRouteAccepted,
   notifyManagerRouteRejected,
+  notifyManagerRouteDocumentsUploaded,
   getUserNotifications,
   markAsRead,
   markAllAsRead,

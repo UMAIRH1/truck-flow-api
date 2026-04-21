@@ -186,6 +186,9 @@ const loadSchema = mongoose.Schema(
             type: String,
             trim: true,
         },
+        initialImages: [{
+            type: String,
+        }],
         podImages: [{
             type: String,
         }],

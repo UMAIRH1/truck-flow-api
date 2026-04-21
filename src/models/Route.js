@@ -179,6 +179,18 @@ const routeSchema = mongoose.Schema(
             trim: true,
         },
 
+        // Proof of delivery and documents
+        podImage: {
+            type: String,
+            default: '',
+        },
+        invoices: [{
+            type: String,
+        }],
+        documents: [{
+            type: String,
+        }],
+
         // Creator reference
         createdBy: {
             type: mongoose.Schema.Types.ObjectId,

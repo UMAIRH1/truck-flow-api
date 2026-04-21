@@ -50,7 +50,7 @@ exports.createDriver = async (req, res) => {
         let emailSent = false;
         let emailError = null;
         try {
-            await sendDriverInvitation(email, name, setupToken);
+            await sendDriverInvitation(email, name, setupToken, driver.preferredLanguage);
             emailSent = true;
             console.log('✅ Driver invitation email sent successfully to:', email);
         } catch (error) {
@@ -248,34 +248,14 @@ exports.deleteDriver = async (req, res) => {
 // @access  Private
 exports.updateProfile = async (req, res) => {
     try {
-        const { name, email, phone, country, avatar, password } = req.body;
-
-        const user = await User.findById(req.user.id);
-
-        if (!user) {
-            return res.status(404).json({
-                success: false,
-                message: 'User not found',
-            });
-        }
-
-        // Check if email is being changed and if it's already taken
-        if (email && email !== user.email) {
-            const existingUser = await User.findOne({ email });
-            if (existingUser) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Email already in use',
-                });
-            }
-            user.email = email;
-        }
-
+        const { name, email, phone, country, avatar, password, preferredLanguage } = req.body;
+...
         // Update fields
         if (name) user.name = name;
         if (phone) user.phone = phone;
         if (country) user.country = country;
         if (avatar) user.avatar = avatar;
+        if (preferredLanguage) user.preferredLanguage = preferredLanguage;
         if (password && password !== '••••••••••••') {
             user.password = password; // Will be hashed by pre-save hook
         }
@@ -293,6 +273,7 @@ exports.updateProfile = async (req, res) => {
                 country: user.country,
                 avatar: user.avatar,
                 role: user.role,
+                preferredLanguage: user.preferredLanguage,
             },
         });
     } catch (err) {

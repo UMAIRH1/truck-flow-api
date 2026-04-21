@@ -714,6 +714,83 @@ const completeRouteLoad = async (req, res) => {
     }
 };
 
+// @desc    Upload invoices and documents for route (driver only)
+// @route   POST /api/routes/:id/documents
+// @access  Private/Driver
+const uploadDocuments = async (req, res) => {
+    try {
+        console.log('=== UPLOAD ROUTE DOCUMENTS API ===');
+        const { invoices, documents, podImage } = req.body;
+
+        if ((!invoices || invoices.length === 0) && (!documents || documents.length === 0) && !podImage) {
+            return res.status(400).json({
+                success: false,
+                message: 'Please provide at least one invoice, document, or POD image',
+            });
+        }
+
+        const route = await Route.findById(req.params.id);
+
+        if (!route) {
+            return res.status(404).json({
+                success: false,
+                message: 'Route not found',
+            });
+        }
+
+        // Check if route is assigned to this driver
+        if (route.assignedDriver.toString() !== req.user._id.toString()) {
+            return res.status(403).json({
+                success: false,
+                message: 'This route is not assigned to you',
+            });
+        }
+
+        // Update route with documents
+        if (podImage) route.podImage = podImage;
+        if (invoices && invoices.length > 0) {
+            route.invoices = [...(route.invoices || []), ...invoices];
+        }
+        if (documents && documents.length > 0) {
+            route.documents = [...(route.documents || []), ...documents];
+        }
+
+        // Mark route as completed
+        route.status = 'completed';
+        route.completedAt = new Date();
+
+        await route.save();
+
+        // Populate route to get manager info
+        await route.populate('createdBy', 'name email');
+        await route.populate('assignedDriver', 'name email phone');
+
+        // Send notification to manager
+        try {
+            await notificationService.notifyManagerRouteDocumentsUploaded(
+                route.createdBy._id,
+                route,
+                req.user.name
+            );
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
+
+        res.status(200).json({
+            success: true,
+            message: 'Route documents uploaded and route completed successfully',
+            route,
+        });
+    } catch (err) {
+        console.error('❌ API Error (uploadRouteDocuments):', err);
+        res.status(500).json({
+            success: false,
+            message: 'Server error: ' + err.message,
+            error: err.message
+        });
+    }
+};
+
 module.exports = {
     createRoute,
     getRoutes,
@@ -728,4 +805,5 @@ module.exports = {
     completeRoute,
     startRouteLoad,
     completeRouteLoad,
+    uploadDocuments,
 };
