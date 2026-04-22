@@ -13,6 +13,7 @@ const {
     completeRoute,
     startRouteLoad,
     completeRouteLoad,
+    uploadDocuments,
 } = require('../controllers/routeController');
 const { protect, authorize } = require('../middleware/auth');
 
@@ -35,6 +36,7 @@ router.patch('/:id/start', authorize('driver'), startRoute);
 router.patch('/:id/complete', authorize('driver'), completeRoute);
 router.patch('/:id/loads/:loadId/start', authorize('driver'), startRouteLoad);
 router.patch('/:id/loads/:loadId/complete', authorize('driver'), completeRouteLoad);
+router.post('/:id/documents', authorize('driver'), uploadDocuments);
 
 // Both manager and driver
 router.get('/', getRoutes);
