@@ -249,7 +249,15 @@ exports.deleteDriver = async (req, res) => {
 exports.updateProfile = async (req, res) => {
     try {
         const { name, email, phone, country, avatar, password, preferredLanguage } = req.body;
-...
+
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: 'User not found',
+            });
+        }
+
         // Update fields
         if (name) user.name = name;
         if (phone) user.phone = phone;
