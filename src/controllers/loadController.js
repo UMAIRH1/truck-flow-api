@@ -895,6 +895,7 @@ exports.calculateCosts = async (req, res) => {
         const { 
             distance,
             clientPrice,
+            driverPrice = 0,
             fuelConsumption = 30,
             fuelPricePerLiter = 0,
             driverDailyCost = 0,
@@ -912,7 +913,7 @@ exports.calculateCosts = async (req, res) => {
 
         // Calculate costs using the same formula as the model
         const fuelCost = (distance * fuelConsumption / 100) * fuelPricePerLiter;
-        const driverCost = driverDailyCost;
+        const driverCost = (parseFloat(driverPrice) || 0) + (parseFloat(driverDailyCost) || 0);
         const truckCost = distance * truckCostPerKm;
         const totalCost = fuelCost + driverCost + truckCost + tolls + otherExpenses;
         const profit = clientPrice - totalCost;
