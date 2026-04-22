@@ -27,7 +27,8 @@ exports.createLoad = async (req, res) => {
             notes,
             driverId,
             pickupCoords,
-            dropoffCoords
+            dropoffCoords,
+            initialImages
         } = req.body;
 
         // Safety check for user (should be handled by middleware)
@@ -110,6 +111,7 @@ exports.createLoad = async (req, res) => {
             otherExpenses: otherExpenses || 0,
             notes: notes || '',
             status: 'pending',
+            initialImages: initialImages || [],
             
             // Cost model fields (with defaults)
             fuelConsumption: req.body.fuelConsumption || 30,
@@ -304,6 +306,7 @@ exports.updateLoad = async (req, res) => {
             tolls,
             otherExpenses,
             notes,
+            initialImages,
         } = req.body;
 
         // Update fields if provided
@@ -323,6 +326,7 @@ exports.updateLoad = async (req, res) => {
         if (tolls !== undefined) load.tolls = tolls;
         if (otherExpenses !== undefined) load.otherExpenses = otherExpenses;
         if (notes !== undefined) load.notes = notes;
+        if (initialImages !== undefined) load.initialImages = initialImages;
 
         await load.save();
 
