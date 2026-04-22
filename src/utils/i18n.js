@@ -136,4 +136,34 @@ const t = (key, lang = 'en', params = {}) => {
   return message;
 };
 
-module.exports = { t };
+/**
+ * Middleware to detect language from request
+ */
+const languageMiddleware = (req, res, next) => {
+  // 1. Check for Accept-Language header
+  let lang = req.headers['accept-language'] || 'en';
+  
+  // Clean up language string (e.g., 'el,en-US;q=0.9,en;q=0.8' -> 'el')
+  if (lang.includes(',')) {
+    lang = lang.split(',')[0];
+  }
+  if (lang.includes('-')) {
+    lang = lang.split('-')[0];
+  }
+  
+  // 2. If user is logged in, they might have a preference in their profile
+  // Note: auth middleware runs later, so we check if req.user exists just in case
+  if (req.user && req.user.preferredLanguage) {
+    lang = req.user.preferredLanguage;
+  }
+
+  // Ensure we support the language, default to en
+  if (!['en', 'el'].includes(lang)) {
+    lang = 'en';
+  }
+
+  req.language = lang;
+  next();
+};
+
+module.exports = { t, languageMiddleware };
