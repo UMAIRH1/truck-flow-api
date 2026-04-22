@@ -307,7 +307,7 @@ const sendRouteNotificationEmail = async (user, route, context = 'assigned', dri
 
     const mailOptions = {
       from: `"TruckFlow" <${process.env.SMTP_USER}>`,
-      to: driver.email,
+      to: user.email,
       subject: `${subject} - TruckFlow`,
       html: `
         <!DOCTYPE html>
@@ -333,7 +333,7 @@ const sendRouteNotificationEmail = async (user, route, context = 'assigned', dri
             </div>
             <div class="content">
               <h2>${title}</h2>
-              <p>Hi ${driver.name},</p>
+              <p>Hi ${user.name},</p>
               <p>${intro}</p>
               
               <div class="details-box">
@@ -371,7 +371,7 @@ const sendRouteNotificationEmail = async (user, route, context = 'assigned', dri
     };
 
     await transporter.sendMail(mailOptions);
-    console.log('Route assignment email sent to:', driver.email);
+    console.log('Route assignment email sent to:', user.email);
     return true;
   } catch (error) {
     console.error('Error sending route assignment email:', error);
