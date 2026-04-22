@@ -474,6 +474,27 @@ const notifyManagerRouteAccepted = async (managerId, route, driverName) => {
 };
 
 /**
+ * Notify manager about route rejection
+ */
+const notifyManagerRouteRejected = async (managerId, route, driverName) => {
+  return createNotification({
+    userId: managerId,
+    type: 'route_rejected',
+    title: 'Route Rejected',
+    message: `${driverName} rejected route: ${route.routeName}`,
+    titleKey: 'notifications.routeRejected',
+    messageKey: 'notifications.driverRejectedRoute',
+    params: {
+      driverName,
+      routeName: route.routeName,
+      routeNumber: route.routeNumber
+    },
+    routeId: route._id,
+    loadNumber: route.routeNumber
+  });
+};
+
+/**
  * Notify manager when driver uploads route documents
  */
 const notifyManagerRouteDocumentsUploaded = async (managerId, route, driverName) => {
