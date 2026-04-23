@@ -177,15 +177,15 @@ const notifyDriverLoadAssigned = async (driverId, load) => {
     loadNumber: loadNum
   });
 
-  // Send email notification
-  try {
-    const driver = await User.findById(driverId);
-    if (driver && driver.email) {
-      await emailService.sendLoadNotificationEmail(driver, load, 'assigned');
-    }
-  } catch (error) {
-    console.error('Failed to send assignment email:', error);
-  }
+  // Send email notification (DISABLED)
+  // try {
+  //   const driver = await User.findById(driverId);
+  //   if (driver && driver.email) {
+  //     await emailService.sendLoadNotificationEmail(driver, load, 'assigned');
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send assignment email:', error);
+  // }
 
   return notification;
 };
@@ -213,20 +213,20 @@ const notifyManagerLoadAccepted = async (managerId, load, driverName) => {
     loadNumber: loadNum
   });
 
-  // Send email to manager
-  try {
-    const manager = await User.findById(managerId);
-    if (manager && manager.email) {
-      await emailService.sendLoadNotificationEmail(
-        { email: manager.email, name: manager.name }, 
-        load, 
-        'accepted',
-        driverName
-      );
-    }
-  } catch (error) {
-    console.error('Failed to send acceptance email to manager:', error);
-  }
+  // Send email to manager (DISABLED)
+  // try {
+  //   const manager = await User.findById(managerId);
+  //   if (manager && manager.email) {
+  //     await emailService.sendLoadNotificationEmail(
+  //       { email: manager.email, name: manager.name }, 
+  //       load, 
+  //       'accepted',
+  //       driverName
+  //     );
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send acceptance email to manager:', error);
+  // }
 
   return notification;
 };
@@ -254,20 +254,20 @@ const notifyManagerLoadRejected = async (managerId, load, driverName) => {
     loadNumber: loadNum
   });
 
-  // Send email to manager
-  try {
-    const manager = await User.findById(managerId);
-    if (manager && manager.email) {
-      await emailService.sendLoadNotificationEmail(
-        { email: manager.email, name: manager.name }, 
-        load, 
-        'rejected',
-        driverName
-      );
-    }
-  } catch (error) {
-    console.error('Failed to send rejection email to manager:', error);
-  }
+  // Send email to manager (DISABLED)
+  // try {
+  //   const manager = await User.findById(managerId);
+  //   if (manager && manager.email) {
+  //     await emailService.sendLoadNotificationEmail(
+  //       { email: manager.email, name: manager.name }, 
+  //       load, 
+  //       'rejected',
+  //       driverName
+  //     );
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send rejection email to manager:', error);
+  // }
 
   return notification;
 };
@@ -295,20 +295,20 @@ const notifyManagerLoadCompleted = async (managerId, load, driverName) => {
     loadNumber: loadNum
   });
 
-  // Send email to manager
-  try {
-    const manager = await User.findById(managerId);
-    if (manager && manager.email) {
-      await emailService.sendLoadNotificationEmail(
-        { email: manager.email, name: manager.name }, 
-        load, 
-        'completed',
-        driverName
-      );
-    }
-  } catch (error) {
-    console.error('Failed to send completion email to manager:', error);
-  }
+  // Send email to manager (DISABLED)
+  // try {
+  //   const manager = await User.findById(managerId);
+  //   if (manager && manager.email) {
+  //     await emailService.sendLoadNotificationEmail(
+  //       { email: manager.email, name: manager.name }, 
+  //       load, 
+  //       'completed',
+  //       driverName
+  //     );
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send completion email to manager:', error);
+  // }
 
   return notification;
 };
@@ -395,20 +395,20 @@ const notifyManagerDocumentsUploaded = async (managerId, load, driverName) => {
     loadNumber: loadNum
   });
 
-  // Send email to manager
-  try {
-    const manager = await User.findById(managerId);
-    if (manager && manager.email) {
-      await emailService.sendLoadNotificationEmail(
-        { email: manager.email, name: manager.name }, 
-        load, 
-        'documents_uploaded',
-        driverName
-      );
-    }
-  } catch (error) {
-    console.error('Failed to send documents uploaded email to manager:', error);
-  }
+  // Send email to manager (DISABLED)
+  // try {
+  //   const manager = await User.findById(managerId);
+  //   if (manager && manager.email) {
+  //     await emailService.sendLoadNotificationEmail(
+  //       { email: manager.email, name: manager.name }, 
+  //       load, 
+  //       'documents_uploaded',
+  //       driverName
+  //     );
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send documents uploaded email to manager:', error);
+  // }
 
   return notification;
 };
@@ -439,15 +439,15 @@ const notifyDriverRouteAssigned = async (driverId, route) => {
     loadNumber: route.routeNumber
   });
 
-  // Send email notification
-  try {
-    const driver = await User.findById(driverId);
-    if (driver && driver.email) {
-      await emailService.sendRouteNotificationEmail(driver, route);
-    }
-  } catch (error) {
-    console.error('Failed to send route assignment email:', error);
-  }
+  // Send email notification (DISABLED)
+  // try {
+  //   const driver = await User.findById(driverId);
+  //   if (driver && driver.email) {
+  //     await emailService.sendRouteNotificationEmail(driver, route);
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send route assignment email:', error);
+  // }
 
   return notification;
 };
@@ -516,15 +516,15 @@ const notifyManagerRouteDocumentsUploaded = async (managerId, route, driverName)
     loadNumber: routeNum
   });
 
-  // Send email to manager
-  try {
-    const manager = await User.findById(managerId);
-    if (manager && manager.email) {
-      await emailService.sendRouteNotificationEmail(manager, route, 'documents_uploaded', driverName);
-    }
-  } catch (error) {
-    console.error('Failed to send route documents uploaded email to manager:', error);
-  }
+  // Send email to manager (DISABLED)
+  // try {
+  //   const manager = await User.findById(managerId);
+  //   if (manager && manager.email) {
+  //     await emailService.sendRouteNotificationEmail(manager, route, 'documents_uploaded', driverName);
+  //   }
+  // } catch (error) {
+  //   console.error('Failed to send route documents uploaded email to manager:', error);
+  // }
 
   return notification;
 };
