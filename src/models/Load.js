@@ -117,6 +117,12 @@ const loadSchema = mongoose.Schema(
             ref: 'User',
         },
 
+        // Multi-driver broadcasting: list of drivers who can see/accept this load
+        broadcastTo: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        }],
+
         // Route reference (if load is part of a route)
         // A Load can exist independently or be attached to a Route
         routeId: {
@@ -225,6 +231,7 @@ const loadSchema = mongoose.Schema(
 // Index for faster queries
 loadSchema.index({ status: 1, createdBy: 1 });
 loadSchema.index({ assignedDriver: 1, status: 1 });
+loadSchema.index({ broadcastTo: 1, status: 1 });
 loadSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate costs

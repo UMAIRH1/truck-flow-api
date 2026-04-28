@@ -26,6 +26,7 @@ exports.createLoad = async (req, res) => {
             otherExpenses,
             notes,
             driverId,
+            driverIds, // NEW: array of driver IDs for multi-broadcast
             pickupCoords,
             dropoffCoords,
             initialImages
@@ -120,9 +121,15 @@ exports.createLoad = async (req, res) => {
             truckCostPerKm: req.body.truckCostPerKm || 0,
         };
 
-        // Add driver if provided
-        if (driverId) {
-            loadData.assignedDriver = driverId;
+        // Add driver(s) based on single or multi-select
+        const effectiveDriverIds = driverIds && driverIds.length > 0 ? driverIds : (driverId ? [driverId] : []);
+        
+        if (effectiveDriverIds.length === 1) {
+            // Single driver: assign directly (existing behavior)
+            loadData.assignedDriver = effectiveDriverIds[0];
+        } else if (effectiveDriverIds.length > 1) {
+            // Multiple drivers: broadcast to all, no assigned driver yet
+            loadData.broadcastTo = effectiveDriverIds;
         }
 
         // Create load
@@ -131,15 +138,36 @@ exports.createLoad = async (req, res) => {
         // Populate driver info if assigned
         const populatedLoad = await Load.findById(load._id)
             .populate('createdBy', 'name email')
-            .populate('assignedDriver', 'name email phone');
+            .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone');
 
-        // Send notification to driver if assigned
-        if (driverId) {
-            try {
-                await notificationService.notifyDriverLoadAssigned(driverId, populatedLoad);
-            } catch (notifError) {
-                console.error('Error sending notification:', notifError);
+        // Send notifications to driver(s)
+        try {
+            if (effectiveDriverIds.length === 1) {
+                // Single driver notification
+                await notificationService.notifyDriverLoadAssigned(effectiveDriverIds[0], populatedLoad);
+            } else if (effectiveDriverIds.length > 1) {
+                // Broadcast to all drivers
+                for (const did of effectiveDriverIds) {
+                    await notificationService.notifyDriverLoadAssigned(did, populatedLoad);
+                }
             }
+        } catch (notifError) {
+            console.error('Error sending notification:', notifError);
+        }
+
+        // Emit real-time load_update to all broadcast/assigned drivers
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            for (const did of effectiveDriverIds) {
+                io.to(`user:${did}`).emit('load_update', {
+                    action: 'new',
+                    load: populatedLoad,
+                });
+            }
+        } catch (socketErr) {
+            console.error('Socket emit error:', socketErr);
         }
 
         res.status(201).json({
@@ -165,9 +193,12 @@ exports.getLoads = async (req, res) => {
     try {
         let query = {};
 
-        // Driver can only see their assigned loads
+        // Driver can see: assigned loads OR loads broadcast to them
         if (req.user.role === 'driver') {
-            query.assignedDriver = req.user._id;
+            query.$or = [
+                { assignedDriver: req.user._id },
+                { broadcastTo: req.user._id }
+            ];
         } else if (req.user.role === 'manager') {
             // Manager sees loads they created
             query.createdBy = req.user._id;
@@ -455,38 +486,56 @@ exports.assignDriver = async (req, res) => {
     }
 };
 
-// @desc    Accept load (driver only)
+// @desc    Accept load (driver only) — ATOMIC to prevent race conditions
 // @route   PATCH /api/loads/:id/accept
 // @access  Private/Driver
 exports.acceptLoad = async (req, res) => {
     try {
-        const load = await findLoadByIdOrNumber(req.params.id);
+        // First, find the load to get its details
+        const loadCheck = await findLoadByIdOrNumber(req.params.id);
 
-        if (!load) {
+        if (!loadCheck) {
             return res.status(404).json({
                 success: false,
                 message: 'Load not found',
             });
         }
 
-        // Check if load is assigned to this driver
-        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
+        // Check if this driver is authorized (assigned directly OR in broadcastTo)
+        const driverId = req.user._id.toString();
+        const isAssigned = loadCheck.assignedDriver && loadCheck.assignedDriver.toString() === driverId;
+        const isBroadcast = loadCheck.broadcastTo && loadCheck.broadcastTo.some(id => id.toString() === driverId);
+
+        if (!isAssigned && !isBroadcast) {
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
             });
         }
 
-        // Check if load is in pending status
-        if (load.status !== 'pending') {
-            return res.status(400).json({
+        // ATOMIC acceptance: only succeeds if status is still 'pending'
+        // This prevents two drivers from accepting simultaneously
+        const previousBroadcastTo = loadCheck.broadcastTo ? loadCheck.broadcastTo.map(id => id.toString()) : [];
+        
+        const load = await Load.findOneAndUpdate(
+            { _id: loadCheck._id, status: 'pending' },
+            {
+                $set: {
+                    status: 'accepted',
+                    assignedDriver: req.user._id,
+                    broadcastTo: [],
+                }
+            },
+            { new: true }
+        );
+
+        if (!load) {
+            // Another driver already accepted this load
+            return res.status(409).json({
                 success: false,
-                message: `Cannot accept a load with status '${load.status}'`,
+                message: 'This load has already been accepted by another driver',
             });
         }
-
-        load.status = 'accepted';
-        await load.save();
 
         // Populate load to get driver name
         await load.populate('createdBy', 'name email');
@@ -501,6 +550,22 @@ exports.acceptLoad = async (req, res) => {
             );
         } catch (notifError) {
             console.error('Error sending notification:', notifError);
+        }
+
+        // Emit WebSocket events to OTHER broadcast drivers to remove this load
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            for (const otherDriverId of previousBroadcastTo) {
+                if (otherDriverId !== driverId) {
+                    io.to(`user:${otherDriverId}`).emit('load_update', {
+                        action: 'accepted_by_other',
+                        loadId: load._id.toString(),
+                    });
+                }
+            }
+        } catch (socketErr) {
+            console.error('Socket emit error:', socketErr);
         }
 
         res.status(200).json({
@@ -532,8 +597,12 @@ exports.declineLoad = async (req, res) => {
             });
         }
 
-        // Check if load is assigned to this driver
-        if (!load.assignedDriver || load.assignedDriver.toString() !== req.user._id.toString()) {
+        // Check if this driver is authorized (assigned directly OR in broadcastTo)
+        const driverId = req.user._id.toString();
+        const isAssigned = load.assignedDriver && load.assignedDriver.toString() === driverId;
+        const isBroadcast = load.broadcastTo && load.broadcastTo.some(id => id.toString() === driverId);
+
+        if (!isAssigned && !isBroadcast) {
             return res.status(403).json({
                 success: false,
                 message: 'This load is not assigned to you',
@@ -548,8 +617,20 @@ exports.declineLoad = async (req, res) => {
             });
         }
 
-        load.status = 'rejected';
-        await load.save();
+        if (isBroadcast && !isAssigned) {
+            // Broadcast load: remove this driver from broadcastTo
+            load.broadcastTo = load.broadcastTo.filter(id => id.toString() !== driverId);
+            
+            // If no drivers left in broadcastTo, notify manager
+            if (load.broadcastTo.length === 0) {
+                load.status = 'rejected';
+            }
+            await load.save();
+        } else {
+            // Direct assignment: reject as before
+            load.status = 'rejected';
+            await load.save();
+        }
 
         // Populate load to get manager info
         await load.populate('createdBy', 'name email');
