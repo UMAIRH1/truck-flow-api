@@ -212,6 +212,7 @@ exports.getLoads = async (req, res) => {
         const loads = await Load.find(query)
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone')
             .sort({ createdAt: -1 });
 
         res.status(200).json({
