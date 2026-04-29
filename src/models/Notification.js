@@ -11,7 +11,7 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: [
       'load_created', 'load_assigned', 'load_accepted', 'load_rejected', 'load_completed', 'load_cancelled', 'documents_uploaded',
-      'route_assigned', 'route_accepted', 'route_rejected'
+      'load_in_transit', 'route_assigned', 'route_accepted', 'route_rejected', 'route_documents_uploaded'
     ],
     required: true
   },
