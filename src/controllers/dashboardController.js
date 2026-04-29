@@ -152,9 +152,12 @@ exports.getManagerDashboard = async (req, res) => {
 // @access  Private/Driver
 exports.getDriverDashboard = async (req, res) => {
     try {
-        // Assigned loads (pending)
+        // Assigned loads (pending) - includes direct assignments and broadcasts
         const assignedLoads = await Load.countDocuments({
-            assignedDriver: req.user._id,
+            $or: [
+                { assignedDriver: req.user._id },
+                { broadcastTo: req.user._id }
+            ],
             status: 'pending',
         });
 
