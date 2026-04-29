@@ -216,6 +216,18 @@ exports.getLoads = async (req, res) => {
             .populate('broadcastTo', 'name email phone')
             .sort({ createdAt: -1 });
 
+        // Security: If user is a driver, filter broadcastTo to only show themselves
+        // and remove assignedDriver if it's not them (for safety)
+        if (req.user.role === 'driver') {
+            loads.forEach(load => {
+                if (load.broadcastTo) {
+                    load.broadcastTo = load.broadcastTo.filter(d => 
+                        d._id.toString() === req.user._id.toString()
+                    );
+                }
+            });
+        }
+
         res.status(200).json({
             success: true,
             count: loads.length,
@@ -278,6 +290,15 @@ exports.getLoad = async (req, res) => {
                 success: false,
                 message: 'Not authorized to view this load',
             });
+        }
+
+        // Security: If user is a driver, filter broadcastTo to only show themselves
+        if (req.user.role === 'driver') {
+            if (load.broadcastTo) {
+                load.broadcastTo = load.broadcastTo.filter(d => 
+                    d._id.toString() === req.user._id.toString()
+                );
+            }
         }
 
         res.status(200).json({
@@ -458,7 +479,28 @@ exports.deleteLoad = async (req, res) => {
             });
         }
 
+        const previousBroadcastTo = load.broadcastTo ? load.broadcastTo.map(id => id.toString()) : [];
+        const previousAssignedDriver = load.assignedDriver ? load.assignedDriver.toString() : null;
+        const loadId = load._id.toString();
+
         await load.deleteOne();
+
+        // Emit WebSocket events to remove this load from drivers
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            const recipients = new Set(previousBroadcastTo);
+            if (previousAssignedDriver) recipients.add(previousAssignedDriver);
+
+            for (const did of recipients) {
+                io.to(`user:${did}`).emit('load_update', {
+                    action: 'accepted_by_other', // REUSE this action as it triggers removal on frontend
+                    loadId: loadId,
+                });
+            }
+        } catch (socketErr) {
+            console.error('Socket emit error:', socketErr);
+        }
 
         res.status(200).json({
             success: true,
