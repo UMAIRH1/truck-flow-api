@@ -339,6 +339,11 @@ exports.updateLoad = async (req, res) => {
             otherExpenses,
             notes,
             initialImages,
+            driverIds,
+            fuelConsumption,
+            fuelPricePerLiter,
+            driverDailyCost,
+            truckCostPerKm,
         } = req.body;
 
         // Update fields if provided
@@ -359,6 +364,26 @@ exports.updateLoad = async (req, res) => {
         if (otherExpenses !== undefined) load.otherExpenses = otherExpenses;
         if (notes !== undefined) load.notes = notes;
         if (initialImages !== undefined) load.initialImages = initialImages;
+        if (fuelConsumption !== undefined) load.fuelConsumption = fuelConsumption;
+        if (fuelPricePerLiter !== undefined) load.fuelPricePerLiter = fuelPricePerLiter;
+        if (driverDailyCost !== undefined) load.driverDailyCost = driverDailyCost;
+        if (truckCostPerKm !== undefined) load.truckCostPerKm = truckCostPerKm;
+
+        // Multi-driver handling in update
+        let driversChanged = false;
+        if (driverIds !== undefined) {
+            driversChanged = true;
+            if (driverIds.length === 1) {
+                load.assignedDriver = driverIds[0];
+                load.broadcastTo = [];
+            } else if (driverIds.length > 1) {
+                load.assignedDriver = null;
+                load.broadcastTo = driverIds;
+            } else {
+                load.assignedDriver = null;
+                load.broadcastTo = [];
+            }
+        }
 
         await load.save();
 
@@ -373,7 +398,34 @@ exports.updateLoad = async (req, res) => {
 
         const updatedLoad = await Load.findById(load._id)
             .populate('createdBy', 'name email')
-            .populate('assignedDriver', 'name email phone');
+            .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone');
+
+        // Handle notifications for updated loads
+        if (driversChanged) {
+            try {
+                const notificationService = require('../services/notificationService');
+                const effectiveDriverIds = updatedLoad.broadcastTo.length > 0 
+                  ? updatedLoad.broadcastTo.map(d => d._id) 
+                  : (updatedLoad.assignedDriver ? [updatedLoad.assignedDriver._id] : []);
+
+                for (const did of effectiveDriverIds) {
+                    await notificationService.notifyDriverLoadAssigned(did, updatedLoad);
+                }
+
+                // Emit real-time load_update
+                const { getIO } = require('../config/socket');
+                const io = getIO();
+                for (const did of effectiveDriverIds) {
+                    io.to(`user:${did}`).emit('load_update', {
+                        action: 'updated',
+                        load: updatedLoad,
+                    });
+                }
+            } catch (notifErr) {
+                console.error('Error sending update notifications:', notifErr);
+            }
+        }
 
         res.status(200).json({
             success: true,
