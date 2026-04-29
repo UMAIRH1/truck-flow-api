@@ -132,6 +132,7 @@ exports.createLoad = async (req, res) => {
             loadData.broadcastTo = effectiveDriverIds;
         }
 
+
         // Create load
         const load = await Load.create(loadData);
 
@@ -385,6 +386,7 @@ exports.updateLoad = async (req, res) => {
             }
         }
 
+        
         await load.save();
 
         // If load is attached to a route, trigger route recalculation
