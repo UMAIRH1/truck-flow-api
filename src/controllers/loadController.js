@@ -275,21 +275,22 @@ exports.getLoad = async (req, res) => {
         // Populate after finding
         await load.populate('createdBy', 'name email');
         await load.populate('assignedDriver', 'name email phone');
+        await load.populate('broadcastTo', 'name email phone');
 
-        if (!load) {
-            return res.status(404).json({
-                success: false,
-                message: 'Load not found',
-            });
-        }
-
-        // Driver can only view their assigned loads
-        if (req.user.role === 'driver' && 
-            (!load.assignedDriver || load.assignedDriver._id.toString() !== req.user._id.toString())) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to view this load',
-            });
+        // Driver can only view loads assigned to them OR broadcast to them
+        if (req.user.role === 'driver') {
+            const driverId = req.user._id.toString();
+            const isAssigned = load.assignedDriver && load.assignedDriver._id.toString() === driverId;
+            const isBroadcast = load.broadcastTo && load.broadcastTo.some(d => 
+                (d._id || d).toString() === driverId
+            );
+            
+            if (!isAssigned && !isBroadcast) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Not authorized to view this load',
+                });
+            }
         }
 
         // Security: If user is a driver, filter broadcastTo to only show themselves
@@ -650,15 +651,38 @@ exports.acceptLoad = async (req, res) => {
         }
 
         // Emit WebSocket events to OTHER broadcast drivers to remove this load
+        // AND delete their notifications for this load
         try {
             const { getIO } = require('../config/socket');
             const io = getIO();
+            const Notification = require('../models/Notification');
+            
             for (const otherDriverId of previousBroadcastTo) {
                 if (otherDriverId !== driverId) {
+                    // Remove the load from their dashboard
                     io.to(`user:${otherDriverId}`).emit('load_update', {
                         action: 'accepted_by_other',
                         loadId: load._id.toString(),
                     });
+                    
+                    // Delete notifications for this load from other drivers
+                    const deletedNotifs = await Notification.find({
+                        userId: otherDriverId,
+                        loadId: load._id,
+                    }).select('_id');
+                    
+                    if (deletedNotifs.length > 0) {
+                        await Notification.deleteMany({
+                            userId: otherDriverId,
+                            loadId: load._id,
+                        });
+                        
+                        // Notify the frontend to remove these notifications from UI
+                        io.to(`user:${otherDriverId}`).emit('notifications_removed', {
+                            loadId: load._id.toString(),
+                            notificationIds: deletedNotifs.map(n => n._id.toString()),
+                        });
+                    }
                 }
             }
         } catch (socketErr) {
