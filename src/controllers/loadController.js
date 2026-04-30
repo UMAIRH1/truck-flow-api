@@ -409,6 +409,13 @@ exports.updateLoad = async (req, res) => {
         }
 
         
+        // Capture previous recipients for notification cleanup
+        const previousRecipients = new Set();
+        if (load.assignedDriver) previousRecipients.add(load.assignedDriver.toString());
+        if (load.broadcastTo && load.broadcastTo.length > 0) {
+            load.broadcastTo.forEach(id => previousRecipients.add(id.toString()));
+        }
+
         await load.save();
 
         // If load is attached to a route, trigger route recalculation
@@ -429,22 +436,49 @@ exports.updateLoad = async (req, res) => {
         if (driversChanged) {
             try {
                 const notificationService = require('../services/notificationService');
-                const effectiveDriverIds = updatedLoad.broadcastTo.length > 0 
-                  ? updatedLoad.broadcastTo.map(d => d._id) 
-                  : (updatedLoad.assignedDriver ? [updatedLoad.assignedDriver._id] : []);
-
-                for (const did of effectiveDriverIds) {
-                    await notificationService.notifyDriverLoadAssigned(did, updatedLoad);
-                }
-
-                // Emit real-time load_update
+                const Notification = require('../models/Notification');
                 const { getIO } = require('../config/socket');
                 const io = getIO();
+
+                const effectiveDriverIds = updatedLoad.broadcastTo.length > 0 
+                  ? updatedLoad.broadcastTo.map(d => d._id.toString()) 
+                  : (updatedLoad.assignedDriver ? [updatedLoad.assignedDriver._id.toString()] : []);
+
+                // 1. Notify new/current drivers
                 for (const did of effectiveDriverIds) {
+                    await notificationService.notifyDriverLoadAssigned(did, updatedLoad);
                     io.to(`user:${did}`).emit('load_update', {
                         action: 'updated',
                         load: updatedLoad,
                     });
+                }
+
+                // 2. Cleanup notifications for REMOVED drivers
+                for (const oldDid of previousRecipients) {
+                    if (!effectiveDriverIds.includes(oldDid)) {
+                        // This driver was removed from the load
+                        const deletedNotifs = await Notification.find({
+                            userId: oldDid,
+                            loadId: load._id,
+                        }).select('_id');
+
+                        if (deletedNotifs.length > 0) {
+                            await Notification.deleteMany({
+                                userId: oldDid,
+                                loadId: load._id,
+                            });
+
+                            // Inform them UI-side to remove the load and notification
+                            io.to(`user:${oldDid}`).emit('load_update', {
+                                action: 'accepted_by_other', // Reuse removal action
+                                loadId: load._id.toString(),
+                            });
+                            io.to(`user:${oldDid}`).emit('notifications_removed', {
+                                loadId: load._id.toString(),
+                                notificationIds: deletedNotifs.map(n => n._id.toString()),
+                            });
+                        }
+                    }
                 }
             } catch (notifErr) {
                 console.error('Error sending update notifications:', notifErr);
@@ -554,6 +588,8 @@ exports.assignDriver = async (req, res) => {
             });
         }
 
+        const previousDriverId = load.assignedDriver ? load.assignedDriver.toString() : null;
+
         load.assignedDriver = driverId;
         load.status = 'pending';
         await load.save();
@@ -562,9 +598,44 @@ exports.assignDriver = async (req, res) => {
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone');
 
-        // Send notification to driver
+        // Send notification to new driver
         try {
             await notificationService.notifyDriverLoadAssigned(driverId, updatedLoad);
+            
+            // Emit real-time load_update for new driver
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            io.to(`user:${driverId}`).emit('load_update', {
+                action: 'new',
+                load: updatedLoad,
+            });
+
+            // Cleanup notifications for PREVIOUS driver
+            if (previousDriverId && previousDriverId !== driverId) {
+                const Notification = require('../models/Notification');
+                
+                const deletedNotifs = await Notification.find({
+                    userId: previousDriverId,
+                    loadId: load._id,
+                }).select('_id');
+
+                if (deletedNotifs.length > 0) {
+                    await Notification.deleteMany({
+                        userId: previousDriverId,
+                        loadId: load._id,
+                    });
+
+                    // Inform old driver UI to remove
+                    io.to(`user:${previousDriverId}`).emit('load_update', {
+                        action: 'accepted_by_other',
+                        loadId: load._id.toString(),
+                    });
+                    io.to(`user:${previousDriverId}`).emit('notifications_removed', {
+                        loadId: load._id.toString(),
+                        notificationIds: deletedNotifs.map(n => n._id.toString()),
+                    });
+                }
+            }
         } catch (notifError) {
             console.error('Error sending notification:', notifError);
         }
@@ -757,15 +828,31 @@ exports.declineLoad = async (req, res) => {
         await load.populate('createdBy', 'name email');
         await load.populate('assignedDriver', 'name email phone');
 
-        // Send notification to manager
+        // Clean up the driver's own notification for this load since they actioned it
         try {
-            await notificationService.notifyManagerLoadRejected(
-                load.createdBy._id,
-                load,
-                req.user.name
-            );
-        } catch (notifError) {
-            console.error('Error sending notification:', notifError);
+            const Notification = require('../models/Notification');
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+
+            const deletedNotifs = await Notification.find({
+                userId: driverId,
+                loadId: load._id,
+            }).select('_id');
+
+            if (deletedNotifs.length > 0) {
+                await Notification.deleteMany({
+                    userId: driverId,
+                    loadId: load._id,
+                });
+
+                // Notify the frontend to remove these from UI
+                io.to(`user:${driverId}`).emit('notifications_removed', {
+                    loadId: load._id.toString(),
+                    notificationIds: deletedNotifs.map(n => n._id.toString()),
+                });
+            }
+        } catch (cleanupErr) {
+            console.error('Error cleaning up rejected load notification:', cleanupErr);
         }
 
         res.status(200).json({
@@ -898,11 +985,11 @@ exports.uploadPOD = async (req, res) => {
             });
         }
 
-        // Check if load is accepted
-        if (load.status !== 'accepted') {
+        // Check if load is in a state where POD can be uploaded
+        if (load.status !== 'accepted' && load.status !== 'in-progress') {
             return res.status(400).json({
                 success: false,
-                message: 'Can only upload POD for accepted loads',
+                message: 'Can only upload POD for accepted or in-progress loads',
             });
         }
 
