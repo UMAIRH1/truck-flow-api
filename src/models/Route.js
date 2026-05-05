@@ -67,8 +67,17 @@ const routeSchema = mongoose.Schema(
         assignedDriver: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
-            required: [true, 'Please assign a driver'],
+            // Not required: for multi-broadcast routes, assignedDriver is null
+            // until one driver accepts (set atomically via findOneAndUpdate)
+            default: null,
         },
+
+        // Multi-driver broadcasting: list of drivers who can see/accept this route
+        broadcastTo: [{
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+        }],
+
         assignedTruck: {
             truckNumber: String,
             truckType: String,
@@ -217,6 +226,7 @@ const routeSchema = mongoose.Schema(
 // Index for faster queries
 routeSchema.index({ status: 1, createdBy: 1 });
 routeSchema.index({ assignedDriver: 1, status: 1 });
+routeSchema.index({ broadcastTo: 1, status: 1 });
 routeSchema.index({ createdAt: -1 });
 
 // Pre-save middleware to calculate route costs

@@ -13,6 +13,7 @@ const createRoute = async (req, res) => {
             destination,
             totalDistance,
             assignedDriverId,
+            driverIds, // NEW: array for multi-broadcast
             assignedTruck,
             startDate,
             endDate,
@@ -23,7 +24,7 @@ const createRoute = async (req, res) => {
             tolls,
             otherExpenses,
             notes,
-            loadIds, // Array of load IDs to attach
+            loadIds,
             originCoords,
             destinationCoords,
             driverStartingCoords,
@@ -32,15 +33,20 @@ const createRoute = async (req, res) => {
             driverStartingLocation
         } = req.body;
 
+        // Resolve effective driver IDs (support both old single and new multi)
+        const effectiveDriverIds = (driverIds && driverIds.length > 0)
+            ? driverIds
+            : (assignedDriverId ? [assignedDriverId] : []);
+
         // Validate required fields
-        if (!routeName || !assignedDriverId || !startDate) {
+        if (!routeName || !startDate || effectiveDriverIds.length === 0) {
             return res.status(400).json({
                 success: false,
-                message: 'Route name, driver, and start date are required',
+                message: 'Route name, at least one driver, and start date are required',
             });
         }
 
-        // Create route
+        // Build route data
         const routeData = {
             routeName,
             origin: origin || '',
@@ -52,7 +58,6 @@ const createRoute = async (req, res) => {
             destinationCoords,
             driverStartingCoords,
             driverStartingLocation,
-            assignedDriver: assignedDriverId,
             assignedTruck: assignedTruck || {},
             startDate,
             endDate,
@@ -68,47 +73,49 @@ const createRoute = async (req, res) => {
             loads: [],
         };
 
+        // Single driver → direct assign; multiple → broadcast
+        if (effectiveDriverIds.length === 1) {
+            routeData.assignedDriver = effectiveDriverIds[0];
+        } else {
+            routeData.broadcastTo = effectiveDriverIds;
+            routeData.assignedDriver = null;
+        }
+
         const route = await Route.create(routeData);
 
-        // If loads provided, attach them to route
+        // Attach loads if provided
         if (loadIds && loadIds.length > 0) {
+            const driverForLoads = effectiveDriverIds.length === 1 ? effectiveDriverIds[0] : null;
             await Load.updateMany(
                 { _id: { $in: loadIds } },
-                {
-                    $set: {
-                        routeId: route._id,
-                        assignedDriver: assignedDriverId
-                    }
-                }
+                { $set: { routeId: route._id, ...(driverForLoads && { assignedDriver: driverForLoads }) } }
             );
             route.loads = loadIds;
 
-            // Calculate total distance and revenue from loads ONLY if not provided
             const loads = await Load.find({ _id: { $in: loadIds } });
-
-            if (!totalDistance) {
-                route.totalDistance = loads.reduce((sum, load) => sum + (load.distance || 0), 0);
-            }
-            if (!routeDistance) {
-                route.routeDistance = route.totalDistance;
-            }
-
-            route.totalRevenue = loads.reduce((sum, load) => sum + (load.clientPrice || 0), 0);
-
+            if (!totalDistance) route.totalDistance = loads.reduce((sum, l) => sum + (l.distance || 0), 0);
+            if (!routeDistance) route.routeDistance = route.totalDistance;
+            route.totalRevenue = loads.reduce((sum, l) => sum + (l.clientPrice || 0), 0);
             await route.save();
         }
 
-        // Populate route data
+        // Populate
         const populatedRoute = await Route.findById(route._id)
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone')
             .populate('loads');
 
-        // Send notification to driver
+        // Notify + WebSocket to all drivers
         try {
-            await notificationService.notifyDriverRouteAssigned(assignedDriverId, populatedRoute);
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            for (const did of effectiveDriverIds) {
+                await notificationService.notifyDriverRouteAssigned(did, populatedRoute);
+                io.to(`user:${did}`).emit('route_update', { action: 'new', route: populatedRoute });
+            }
         } catch (notifError) {
-            console.error('Error sending notification:', notifError);
+            console.error('Error sending notifications:', notifError);
         }
 
         res.status(201).json({
@@ -133,15 +140,16 @@ const getRoutes = async (req, res) => {
     try {
         let query = {};
 
-        // Driver can only see their assigned routes
+        // Driver can see: assigned routes OR routes broadcast to them
         if (req.user.role === 'driver') {
-            query.assignedDriver = req.user._id;
+            query.$or = [
+                { assignedDriver: req.user._id },
+                { broadcastTo: req.user._id }
+            ];
         } else if (req.user.role === 'manager') {
-            // Manager sees routes they created
             query.createdBy = req.user._id;
         }
 
-        // Optional status filter
         if (req.query.status) {
             query.status = req.query.status;
         }
@@ -149,8 +157,20 @@ const getRoutes = async (req, res) => {
         const routes = await Route.find(query)
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone')
             .populate('loads')
             .sort({ createdAt: -1 });
+
+        // Privacy: drivers only see themselves in broadcastTo
+        if (req.user.role === 'driver') {
+            routes.forEach(route => {
+                if (route.broadcastTo) {
+                    route.broadcastTo = route.broadcastTo.filter(d =>
+                        d._id.toString() === req.user._id.toString()
+                    );
+                }
+            });
+        }
 
         res.status(200).json({
             success: true,
@@ -175,6 +195,7 @@ const getRoute = async (req, res) => {
         const route = await Route.findById(req.params.id)
             .populate('createdBy', 'name email')
             .populate('assignedDriver', 'name email phone')
+            .populate('broadcastTo', 'name email phone')
             .populate('loads');
 
         if (!route) {
@@ -184,13 +205,23 @@ const getRoute = async (req, res) => {
             });
         }
 
-        // Driver can only view their assigned routes
-        if (req.user.role === 'driver' &&
-            route.assignedDriver._id.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'Not authorized to view this route',
-            });
+        // Driver access: assignedDriver OR in broadcastTo
+        if (req.user.role === 'driver') {
+            const driverId = req.user._id.toString();
+            const isAssigned = route.assignedDriver && route.assignedDriver._id.toString() === driverId;
+            const isBroadcast = route.broadcastTo && route.broadcastTo.some(d => d._id.toString() === driverId);
+
+            if (!isAssigned && !isBroadcast) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Not authorized to view this route',
+                });
+            }
+
+            // Privacy: only show this driver in broadcastTo
+            if (route.broadcastTo) {
+                route.broadcastTo = route.broadcastTo.filter(d => d._id.toString() === driverId);
+            }
         }
 
         res.status(200).json({
@@ -288,6 +319,11 @@ const deleteRoute = async (req, res) => {
             });
         }
 
+        // Capture recipients before deleting
+        const previousBroadcastTo = route.broadcastTo ? route.broadcastTo.map(id => id.toString()) : [];
+        const previousAssignedDriver = route.assignedDriver ? route.assignedDriver.toString() : null;
+        const routeId = route._id.toString();
+
         // Remove routeId from all loads
         await Load.updateMany(
             { routeId: route._id },
@@ -295,6 +331,34 @@ const deleteRoute = async (req, res) => {
         );
 
         await route.deleteOne();
+
+        // Notify affected drivers via WebSocket and clean up their notifications
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            const Notification = require('../models/Notification');
+
+            const recipients = new Set(previousBroadcastTo);
+            if (previousAssignedDriver) recipients.add(previousAssignedDriver);
+
+            for (const did of recipients) {
+                io.to(`user:${did}`).emit('route_update', {
+                    action: 'accepted_by_other',
+                    routeId,
+                });
+                // Clean up notifications
+                const deletedNotifs = await Notification.find({ userId: did, routeId: route._id }).select('_id');
+                if (deletedNotifs.length > 0) {
+                    await Notification.deleteMany({ userId: did, routeId: route._id });
+                    io.to(`user:${did}`).emit('notifications_removed', {
+                        routeId,
+                        notificationIds: deletedNotifs.map(n => n._id.toString()),
+                    });
+                }
+            }
+        } catch (socketErr) {
+            console.error('Socket emit error:', socketErr);
+        }
 
         res.status(200).json({
             success: true,
@@ -430,38 +494,45 @@ const removeLoadFromRoute = async (req, res) => {
 // @access  Private/Driver
 const acceptRoute = async (req, res) => {
     try {
-        const route = await Route.findById(req.params.id);
+        // First fetch to check authorization
+        const routeCheck = await Route.findById(req.params.id);
+
+        if (!routeCheck) {
+            return res.status(404).json({ success: false, message: 'Route not found' });
+        }
+
+        const driverId = req.user._id.toString();
+        const isAssigned = routeCheck.assignedDriver && routeCheck.assignedDriver.toString() === driverId;
+        const isBroadcast = routeCheck.broadcastTo && routeCheck.broadcastTo.some(id => id.toString() === driverId);
+
+        if (!isAssigned && !isBroadcast) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
+        }
+
+        // Save previous broadcast list before clearing it
+        const previousBroadcastTo = routeCheck.broadcastTo
+            ? routeCheck.broadcastTo.map(id => id.toString())
+            : [];
+
+        // ATOMIC: only succeeds if status is still 'pending' — prevents race conditions
+        const route = await Route.findOneAndUpdate(
+            { _id: routeCheck._id, status: 'pending' },
+            { $set: { status: 'accepted', assignedDriver: req.user._id, broadcastTo: [] } },
+            { new: true }
+        );
 
         if (!route) {
-            return res.status(404).json({
+            return res.status(409).json({
                 success: false,
-                message: 'Route not found',
+                message: 'This route has already been accepted by another driver',
             });
         }
-
-        // Check if route is assigned to this driver
-        if (route.assignedDriver.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'This route is not assigned to you',
-            });
-        }
-
-        if (route.status !== 'pending') {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot accept a route with status '${route.status}'`,
-            });
-        }
-
-        route.status = 'accepted';
-        await route.save();
 
         await route.populate('createdBy', 'name email');
         await route.populate('assignedDriver', 'name email phone');
         await route.populate('loads');
 
-        // Send notification to manager
+        // Notify manager
         try {
             await notificationService.notifyManagerRouteAccepted(
                 route.createdBy._id,
@@ -472,18 +543,42 @@ const acceptRoute = async (req, res) => {
             console.error('Error sending notification:', notifError);
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Route accepted successfully',
-            route,
-        });
+        // Emit to all OTHER broadcast drivers: remove this route from their dashboard
+        try {
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+            const Notification = require('../models/Notification');
+
+            for (const otherDriverId of previousBroadcastTo) {
+                if (otherDriverId !== driverId) {
+                    io.to(`user:${otherDriverId}`).emit('route_update', {
+                        action: 'accepted_by_other',
+                        routeId: route._id.toString(),
+                    });
+
+                    // Delete their notifications for this route
+                    const deletedNotifs = await Notification.find({
+                        userId: otherDriverId,
+                        routeId: route._id,
+                    }).select('_id');
+
+                    if (deletedNotifs.length > 0) {
+                        await Notification.deleteMany({ userId: otherDriverId, routeId: route._id });
+                        io.to(`user:${otherDriverId}`).emit('notifications_removed', {
+                            routeId: route._id.toString(),
+                            notificationIds: deletedNotifs.map(n => n._id.toString()),
+                        });
+                    }
+                }
+            }
+        } catch (socketErr) {
+            console.error('Socket emit error:', socketErr);
+        }
+
+        res.status(200).json({ success: true, message: 'Route accepted successfully', route });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({
-            success: false,
-            message: 'Server error: ' + err.message,
-            error: err.message
-        });
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message, error: err.message });
     }
 };
 
@@ -495,56 +590,77 @@ const rejectRoute = async (req, res) => {
         const route = await Route.findById(req.params.id);
 
         if (!route) {
-            return res.status(404).json({
-                success: false,
-                message: 'Route not found',
-            });
+            return res.status(404).json({ success: false, message: 'Route not found' });
         }
 
-        if (route.assignedDriver.toString() !== req.user._id.toString()) {
-            return res.status(403).json({
-                success: false,
-                message: 'This route is not assigned to you',
-            });
+        const driverId = req.user._id.toString();
+        const isAssigned = route.assignedDriver && route.assignedDriver.toString() === driverId;
+        const isBroadcast = route.broadcastTo && route.broadcastTo.some(id => id.toString() === driverId);
+
+        if (!isAssigned && !isBroadcast) {
+            return res.status(403).json({ success: false, message: 'This route is not assigned to you' });
         }
 
         if (route.status !== 'pending') {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot reject a route with status '${route.status}'`,
-            });
+            return res.status(400).json({ success: false, message: `Cannot reject a route with status '${route.status}'` });
         }
 
-        route.status = 'rejected';
-        await route.save();
+        if (isBroadcast && !isAssigned) {
+            // Broadcast route: just remove this one driver from the list
+            route.broadcastTo = route.broadcastTo.filter(id => id.toString() !== driverId);
+            if (route.broadcastTo.length === 0) {
+                route.status = 'rejected';
+            }
+            await route.save();
+        } else {
+            // Direct assignment: reject entirely
+            route.status = 'rejected';
+            await route.save();
+        }
 
         await route.populate('createdBy', 'name email');
         await route.populate('assignedDriver', 'name email phone');
         await route.populate('loads');
 
-        // Send notification to manager
-        try {
-            await notificationService.notifyManagerRouteRejected(
-                route.createdBy._id,
-                route,
-                req.user.name
-            );
-        } catch (notifError) {
-            console.error('Error sending notification:', notifError);
+        // Notify manager only if route is fully rejected
+        if (route.status === 'rejected') {
+            try {
+                await notificationService.notifyManagerRouteRejected(
+                    route.createdBy._id,
+                    route,
+                    req.user.name
+                );
+            } catch (notifError) {
+                console.error('Error sending notification:', notifError);
+            }
         }
 
-        res.status(200).json({
-            success: true,
-            message: 'Route rejected',
-            route,
-        });
+        // Clean up this driver's own notification for this route
+        try {
+            const Notification = require('../models/Notification');
+            const { getIO } = require('../config/socket');
+            const io = getIO();
+
+            const deletedNotifs = await Notification.find({
+                userId: driverId,
+                routeId: route._id,
+            }).select('_id');
+
+            if (deletedNotifs.length > 0) {
+                await Notification.deleteMany({ userId: driverId, routeId: route._id });
+                io.to(`user:${driverId}`).emit('notifications_removed', {
+                    routeId: route._id.toString(),
+                    notificationIds: deletedNotifs.map(n => n._id.toString()),
+                });
+            }
+        } catch (cleanupErr) {
+            console.error('Error cleaning up rejected route notification:', cleanupErr);
+        }
+
+        res.status(200).json({ success: true, message: 'Route rejected', route });
     } catch (err) {
         console.error('❌ API Error:', err);
-        res.status(500).json({
-            success: false,
-            message: 'Server error: ' + err.message,
-            error: err.message
-        });
+        res.status(500).json({ success: false, message: 'Server error: ' + err.message, error: err.message });
     }
 };
 
